@@ -2,8 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <nlohmann/json.hpp>
-// #include <fmt/format.h>
+#include <optional>
+#include "json.hpp"
 
 using json = nlohmann::json;
 
@@ -54,8 +54,11 @@ bool print_file() {
     return true;
 }
 
-std::string read_file(const std::string& name) {
-    std::ifstream file {name};
+std::optional<std::string> read_file(const std::string& name) {
+    std::ifstream file{name};
+    if (file.fail()) {
+        return {};
+    }
     std::stringstream buf;
     buf << file.rdbuf();
     return buf.str();
@@ -63,7 +66,10 @@ std::string read_file(const std::string& name) {
 
 void parse_json() {
     auto str = read_file("hey.json");
-    json j = json::parse(str);
+    if (!str) {
+        return;
+    }
+    json j = json::parse(str.value());
 
     std::cout << j["surname"] << std::endl;
     std::cout << j["age"] << std::endl;

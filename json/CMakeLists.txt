@@ -11,10 +11,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-exceptions")
 include(CTest)
 enable_testing()
 
-# include_directories(/usr/local/Cellar/nlohmann_json/3.3.0/include)
-include_directories(./include/)
-
-add_executable(json main.cpp)
+add_executable(json main.cpp json.hpp)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
