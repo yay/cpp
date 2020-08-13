@@ -4,6 +4,8 @@
 #include <vector>
 #include <optional>
 
+// https://www.boost.org/doc/libs/1_65_0/libs/optional/doc/html/boost_optional/tutorial/performance_considerations.html
+
 template <class T>
 class Array {
 public:
@@ -96,8 +98,7 @@ int main(int, char**)
     if (first) {
         std::cout << "First: " << first.value() << std::endl;
     }
-    auto last = array.last();
-    if (last) {
+    if (auto last = array.last()) {
         std::cout << "Last: " << *last << std::endl;
     }
 
