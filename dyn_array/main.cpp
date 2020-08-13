@@ -1,11 +1,43 @@
-#include <cstdlib>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
-#include <vector>
 #include <optional>
+#include <vector>
+
+struct Foo {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+
+    Foo() {}
+
+    Foo(double x, double y, double z) : x(x), y(y), z(z) {
+        std::cout << "Constructed Foo" << std::endl;
+    }
+
+    Foo(const Foo& other) : x(other.x), y(other.y), z(other.z) {
+        std::cout << "Copy-constructed Foo" << std::endl;
+    }
+
+    Foo(const Foo&& other) : x(other.x), y(other.y), z(other.z) {
+        std::cout << "Move-constructed Foo" << std::endl;
+    }
+
+    Foo& operator=(Foo&& other) {
+        std::cout << "Moved Foo" << std::endl;
+        x = other.x;
+        y = other.y;
+        z = other.z;
+        return *this;
+    }
+
+    ~Foo() {
+        std::cout << "Destroyed Foo" << std::endl;
+    }
+};
 
 // https://www.boost.org/doc/libs/1_65_0/libs/optional/doc/html/boost_optional/tutorial/performance_considerations.html
-
+// https://www.bfilipek.com/2018/05/using-optional.html
 template <class T>
 class Array {
 public:
@@ -16,34 +48,42 @@ public:
         std::free(_storage);
     }
 
-    bool push(T value)
+    bool push(T& value)
     {
-        if (_length >= _capacity) {
-            if (_capacity > 0) {
-                auto new_capacity = _capacity * 2;
-                if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
-                    return false;
-                }
-                _capacity *= new_capacity;
-            } else {
-                auto new_capacity = 1;
-                _storage = static_cast<T*>(std::malloc(new_capacity * sizeof(T)));
-                if (_storage == nullptr) {
-                    return false;
-                }
-                _capacity = new_capacity;
+        if (_size >= _capacity) {
+            if (!grow_capacity()) {
+                return false;
             }
         }
-        _storage[_length] = value;
-        _length += 1;
+        _storage[_size] = value;
+        _size += 1;
         return true;
     }
 
-    std::optional<T> pop();
+    bool push(T&& value)
+    {
+        if (_size >= _capacity) {
+            if (!grow_capacity()) {
+                return false;
+            }
+        }
+        _storage[_size] = std::move(value);
+        _size += 1;
+        return true;
+    }
+
+    std::optional<T> pop()
+    {
+        auto last = this->last();
+        if (_size > 0) {
+            _size -= 1;
+        }
+        return std::move(last);
+    }
 
     std::optional<T> first()
     {
-        if (length() > 0) {
+        if (size() > 0) {
             return _storage[0];
         }
         return {};
@@ -51,14 +91,15 @@ public:
 
     std::optional<T> last()
     {
-        if (length() > 0) {
-            return _storage[_length - 1];
+        if (size() > 0) {
+            return _storage[_size - 1];
         }
         return {};
     }
 
-    bool compact() {
-        auto new_capacity = std::pow(2, std::ceil(std::log2(_length)));
+    bool compact()
+    {
+        auto new_capacity = std::pow(2, std::ceil(std::log2(_size)));
         if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
             return false;
         }
@@ -68,21 +109,52 @@ public:
 
     std::optional<T> operator[](size_t index)
     {
-        if (index < 0 || index >= length()) {
+        if (index < 0 || index >= size()) {
             return {};
         }
         return _storage[index];
     }
 
-    inline size_t length() { return _length; }
+    inline size_t size() { return _size; }
 
     inline size_t capacity() { return _capacity; } // zero or a number that is a power of two
 
 private:
     T* _storage;
-    size_t _length { 0 };
+    size_t _size { 0 };
     size_t _capacity { 0 };
+
+    bool grow_capacity()
+    {
+        if (_capacity > 0) {
+            auto new_capacity = _capacity * 2;
+            if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
+                return false;
+            }
+            std::cout << "Reallocated dynamic array storage to hold up to " << new_capacity
+                      << " elements" << std::endl;
+            _capacity *= new_capacity;
+        } else {
+            auto new_capacity = 1;
+            _storage = static_cast<T*>(std::malloc(new_capacity * sizeof(T)));
+            if (_storage == nullptr) {
+                return false;
+            }
+            std::cout << "Allocated dynamic array storage to hold 1 element" << std::endl;
+            _capacity = new_capacity;
+        }
+        return true;
+    }
 };
+
+void pop_value(Array<int>& array)
+{
+    if (auto value = array.pop()) {
+        std::cout << "Popped value: " << *value << std::endl;
+    } else {
+        std::cout << "Nothing to pop" << std::endl;
+    }
+}
 
 int main(int, char**)
 {
@@ -102,8 +174,17 @@ int main(int, char**)
         std::cout << "Last: " << *last << std::endl;
     }
 
-    std::cout << "Length: " << array.length() << std::endl;
+    std::cout << "Length: " << array.size() << std::endl;
     std::cout << "Capacity: " << array.capacity() << std::endl;
 
-    std::vector<int> hey { 5 };
+    pop_value(array);
+    pop_value(array);
+    pop_value(array);
+    pop_value(array);
+
+    Array<Foo> fooray;
+    fooray.push(Foo { 1.0, 2.0, 3.0 });
+    if (auto first_foo = fooray.pop()) {
+        std::cout << "First foo: " << (*first_foo).z << std::endl;
+    }
 }
