@@ -56,7 +56,7 @@ public:
     }
 
     bool compact() {
-        auto new_capacity = std::pow(2, std::ceil(std::log2(_capacity)));
+        auto new_capacity = std::pow(2, std::ceil(std::log2(_length)));
         if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
             return false;
         }
