@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+#include <optional>
 
 template <class T>
 class Array {
@@ -34,29 +35,30 @@ public:
         _length += 1;
     }
 
-    T pop();
+    std::optional<T> pop();
 
-    T& first()
+    std::optional<T> first()
     {
         if (length() > 0) {
             return _storage[0];
         }
+        return {};
     }
 
-    T& last()
+    std::optional<T> last()
     {
         if (length() > 0) {
             return _storage[_length - 1];
         }
+        return {};
     }
 
     bool compact();
 
-    T operator[](size_t index)
+    std::optional<T> operator[](size_t index)
     {
         if (index < 0 || index >= length()) {
-            std::cout << "Array - Index out of bounds." << std::endl;
-            std::exit(1);
+            return {};
         }
         return _storage[index];
     }
@@ -77,13 +79,20 @@ int main(int, char**)
     array.push(5);
     array.push(7);
     array.push(9);
-    auto r = array[0];
-    std::cout << "Result: " << array[0] << std::endl;
-    std::cout << "Result: " << array[1] << std::endl;
+    std::cout << "array[0]: " << array[0].value() << std::endl;
+    std::cout << "array[1]: " << array[1].value() << std::endl;
+
+    auto first = array.first();
+    if (first) {
+        std::cout << "First: " << first.value() << std::endl;
+    }
+    auto last = array.last();
+    if (last) {
+        std::cout << "Last: " << last.value() << std::endl;
+    }
+
     std::cout << "Length: " << array.length() << std::endl;
     std::cout << "Capacity: " << array.capacity() << std::endl;
-    std::cout << "First: " << array.first() << std::endl;
-    std::cout << "Last: " << array.last() << std::endl;
 
     std::vector<int> hey { 5 };
 }
