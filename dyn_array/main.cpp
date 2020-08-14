@@ -4,35 +4,53 @@
 #include <optional>
 #include <vector>
 
+static int FooId = 0;
 struct Foo {
-    double x = 0.0;
-    double y = 0.0;
-    double z = 0.0;
+    int id = ++FooId;
+    double x;
+    double y;
+    double z;
 
     Foo() {}
 
-    Foo(double x, double y, double z) : x(x), y(y), z(z) {
-        std::cout << "Constructed Foo" << std::endl;
+    Foo(double x, double y, double z)
+        : x(x)
+        , y(y)
+        , z(z)
+    {
+        std::cout << "Constructed Foo-" << id << std::endl;
     }
 
-    Foo(const Foo& other) : x(other.x), y(other.y), z(other.z) {
-        std::cout << "Copy-constructed Foo" << std::endl;
+    Foo(const Foo& other)
+        : x(other.x)
+        , y(other.y)
+        , z(other.z)
+    {
+        std::cout << "Copy-constructed Foo-" << id << std::endl;
     }
 
-    Foo(const Foo&& other) : x(other.x), y(other.y), z(other.z) {
-        std::cout << "Move-constructed Foo" << std::endl;
+    Foo(const Foo&& other)
+        : x(other.x)
+        , y(other.y)
+        , z(other.z)
+    {
+        std::cout << "Move-constructed Foo-" << id << std::endl;
     }
 
-    Foo& operator=(Foo&& other) {
-        std::cout << "Moved Foo" << std::endl;
+    Foo& operator=(Foo&& other)
+    {
+        std::cout << "Moved Foo-" << other.id << std::endl;
+        // The left hand side fields here are all zero initialized.
+        id = other.id;
         x = other.x;
         y = other.y;
         z = other.z;
         return *this;
     }
 
-    ~Foo() {
-        std::cout << "Destroyed Foo" << std::endl;
+    ~Foo()
+    {
+        std::cout << "Destroyed Foo-" << id << std::endl;
     }
 };
 
@@ -74,11 +92,11 @@ public:
 
     std::optional<T> pop()
     {
-        auto last = this->last();
-        if (_size > 0) {
+        if (size() > 0) {
             _size -= 1;
+            return std::move(_storage[_size]);
         }
-        return std::move(last);
+        return {};
     }
 
     std::optional<T> first()
