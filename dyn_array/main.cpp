@@ -21,11 +21,13 @@ struct Foo {
 
     Foo(const Foo& other)
         : x(other.x), y(other.y), z(other.z) {
-        std::cout << "Copy-constructed Foo-" << id << std::endl;
+        // Don't copy the id on clone, let it increment.
+        std::cout << "Copy-constructed Foo-" << id << " from Foo-" << other.id << std::endl;
     }
 
     Foo(const Foo&& other)
-        : x(other.x), y(other.y), z(other.z) {
+        : id(other.id), x(other.x), y(other.y), z(other.z) {
+        // Copy the id on move.
         std::cout << "Move-constructed Foo-" << id << std::endl;
     }
 
@@ -178,6 +180,9 @@ int main(int, char**) {
     pop_value(array);
     pop_value(array);
     pop_value(array);
+
+    Foo f1{7.0, 8.0, 9.0};
+    Foo f2{f1};
 
     Array<Foo> fooray;
     fooray.push(Foo{1.0, 2.0, 3.0});

@@ -101,11 +101,72 @@ void throw_everything() {
     throw std::logic_error("something");
 }
 
+static int FooId = 0;
+struct Foo {
+    int id = ++FooId;
+
+    Foo() {
+        std::cout << "Constructed Foo-" << id << std::endl;
+    }
+
+    Foo(const Foo& other) {
+        // Increment the id instead of copying it.
+        std::cout << "Copy-constructed Foo-" << id << " from Foo-" << other.id << std::endl;
+    }
+
+    Foo(const Foo&& other)
+        : id(other.id) {
+        // Copy the id.
+        std::cout << "Move-constructed Foo-" << id << std::endl;
+    }
+
+    Foo& operator=(Foo&& other) {
+        std::cout << "Moved Foo-" << other.id << std::endl;
+        // The left hand side id here is zero initialized.
+        id = other.id;
+        return *this;
+    }
+
+    ~Foo() {
+        std::cout << "Destroyed Foo-" << id << std::endl;
+    }
+};
+
+void g() {
+    Foo foo1;
+    if (true) {
+        throw std::invalid_argument("Something bad happened");
+        // - executes the destructors for g's local objects
+        // - transfers control back to g's caller in search of a handler
+    }
+    Foo foo2;
+}
+
+void f() {
+    try {
+        g(); // not catching invalid_argument here
+    } catch (std::out_of_range& error) {
+        std::cout << "Caught in f(): " << error.what() << std::endl;
+    }
+    // if f has no exception handlers or no matching exception handlers,
+    // its local objects are also destroyed and the control is transferred
+    // to the f's caller
+}
+
 int main(int, char**) {
     try {
         throw_everything();
     } catch (std::exception& error) {
-        std::cout << "Caught: " << error.what() << std::endl;
+        std::cout << "Caught in main(): " << error.what() << std::endl;
     }
+
+    std::cout << "--------------------" << std::endl;
+
+    try {
+        f();
+    } catch (std::invalid_argument& error) {
+        std::cout << "Caught in main(): " << error.what() << std::endl;
+    }
+
     return 0;
 }
