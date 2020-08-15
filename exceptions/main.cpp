@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <tuple>
+#include <assert.h>
 
 // Jonathan Blow's comments:
 
@@ -101,6 +102,41 @@ void throw_everything() {
     throw std::logic_error("something");
 }
 
+void catch_everything() {
+    try {
+        throw 5;
+        throw "LOL";
+        throw std::logic_error("Duh");
+    } catch (...) {
+        std::cout << "Caught something ¯\\_(ツ)_/¯" << std::endl;
+    }
+    // The above is rarely used. Usually something like this is done:
+    auto heap_int = new int;
+    try {
+        try {
+            throw "Bad stuff";
+        } catch (...) {
+            // Clean up and rethrow.
+            delete heap_int;
+            heap_int = nullptr;
+            throw; // rethrow the caught exception, only works inside a catch block
+        }
+    } catch (...) {
+        std::cout << "heap_int: " << heap_int << std::endl;
+    }
+    // Or
+    try {
+        try {
+            throw "Blah";
+        } catch (...) {
+            // convert the exception into a different type
+            throw std::invalid_argument("Blah");
+        }
+    } catch (std::invalid_argument& error) {
+        std::cout << "Caught invalid_argument: " << error.what() << std::endl;
+    }
+}
+
 static int FooId = 0;
 struct Foo {
     int id = ++FooId;
@@ -132,6 +168,8 @@ struct Foo {
     }
 };
 
+// When you design a function's interface, decide what it's allowed to throw.
+// Be careful about changing what a function can throw.
 void g() {
     Foo foo1;
     if (true) {
@@ -146,12 +184,27 @@ void f() {
     try {
         g(); // not catching invalid_argument here
     } catch (std::out_of_range& error) {
-        std::cout << "Caught in f(): " << error.what() << std::endl;
+        std::cout << "Caught out_of_range in f(): " << error.what() << std::endl;
+    } catch (std::overflow_error& error) {
+        std::cout << "Caught overflow_error in f(): " << error.what() << std::endl;
     }
     // if f has no exception handlers or no matching exception handlers,
     // its local objects are also destroyed and the control is transferred
     // to the f's caller
 }
+
+// noexcept is not enforced at compile time.
+// If a noexcept function actually throws, std::terminate is called.
+void can_not_throw() noexcept {
+    std::cout << "Can't throw, sorry." << std::endl;
+    // throw "No, really, can't!";
+}
+
+// Code is called "exception neutral" when it's set up in such a way that it
+// doesn't know if an exception is thrown or not, but it will respond appropriately
+// regardless (for example, rethrow).
+// Code is called "exception safe" if it keeps the program in a consistent state
+// even if a throw occurs.
 
 int main(int, char**) {
     try {
@@ -162,11 +215,19 @@ int main(int, char**) {
 
     std::cout << "--------------------" << std::endl;
 
+    catch_everything();
+
+    std::cout << "--------------------" << std::endl;
+
     try {
         f();
     } catch (std::invalid_argument& error) {
-        std::cout << "Caught in main(): " << error.what() << std::endl;
+        std::cout << "Caught invalid_argument in main(): " << error.what() << std::endl;
     }
+
+    // An exception can propagate from main() if main() itself or
+    // a function it calls throws an exception that main doesn't catch.
+    // When this happens, the program calls std::terminate().
 
     return 0;
 }
