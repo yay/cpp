@@ -73,7 +73,7 @@ int main(int argc, char *args[]) {
     bool quit = false;
     SDL_Event e;
 
-    SDL_Rect rect = {10, 10, 10, 10};
+    SDL_Rect rect{10, 10, 10, 10};
     auto numbers = create_array();
     quicksort(numbers, 0, int(numbers.size()));
 
@@ -99,7 +99,7 @@ int main(int argc, char *args[]) {
         SDL_FillRect(screenSurface, nullptr, SDL_MapRGB(screenSurface->format, 0x00, 0x00, 0x00));
 
         for (int i = 0, ln = int(numbers.size()); i < ln; i++) {
-            SDL_Rect r = {0, i, numbers[i], 1};
+            SDL_Rect r{0, i, numbers[i], 1};
             SDL_FillRect(screenSurface, &r, SDL_MapRGB(screenSurface->format, 0x00, 0xFF, 0x00));
         }
 

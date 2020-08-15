@@ -1,4 +1,11 @@
+#include <exception>
+#include <stdexcept>
+// Some other standard exceptions are declared here:
+// #include <new>
+// #include <typeinfo>
 #include <iostream>
+#include <string>
+#include <tuple>
 
 // Jonathan Blow's comments:
 
@@ -33,8 +40,6 @@
 
 // - The only types of exceptions I deem acceptable are panics.
 
-
-
 // My questions:
 // - What about stack traces? How do you do this without exceptions?
 //   Do panics give you those? Answer: I see it's possible to set the
@@ -46,6 +51,61 @@
 // properly, you must propagate them manually all the way up the call
 // stack, where it makes sense.
 
-int main(int, char**) {
+void throw_everything() {
+    try {
+        throw 5;
+        std::cout << "You'll never see this" << std::endl;
+    } catch (int error) {
+        std::cout << "Caught: " << error << std::endl;
+    }
 
+    try {
+        throw "Hello, my name is exception";
+    } catch (const char* error) {
+        std::cout << "Caught: " << error << std::endl;
+    }
+
+    try {
+        throw true;
+    } catch (bool error) {
+        std::cout << "Caught: " << (error ? "true" : "false") << std::endl;
+    }
+
+    try {
+        const int answer = 42;
+        throw std::tie("Life is ", answer);
+    } catch (std::tuple<char const(&)[9], int const&> error) {
+        auto [one, two] = error;
+        std::cout << "Caught: " << one << two << std::endl;
+    }
+
+    try {
+        throw std::invalid_argument("69");   // exceptions are usually thrown by value
+    } catch (std::invalid_argument& error) { // and caught by reference
+        std::cout << "Caught: " << error.what() << std::endl;
+    }
+
+    class MyException : std::exception {
+    public:
+        const char* what() const noexcept {
+            return "Blah";
+        }
+    };
+
+    try {
+        throw MyException();
+    } catch (MyException& error) {
+        std::cout << "Caught: " << error.what() << std::endl;
+    }
+
+    throw std::logic_error("something");
+}
+
+int main(int, char**) {
+    try {
+        throw_everything();
+    } catch (std::exception& error) {
+        std::cout << "Caught: " << error.what() << std::endl;
+    }
+    return 0;
 }
