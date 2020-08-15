@@ -25,7 +25,7 @@ struct Foo {
         std::cout << "Copy-constructed Foo-" << id << " from Foo-" << other.id << std::endl;
     }
 
-    Foo(const Foo&& other)
+    Foo(Foo&& other) noexcept
         : id(other.id), x(other.x), y(other.y), z(other.z) {
         // Copy the id on move.
         std::cout << "Move-constructed Foo-" << id << std::endl;

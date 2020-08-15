@@ -151,7 +151,7 @@ struct Foo {
         std::cout << "Copy-constructed Foo-" << id << " from Foo-" << other.id << std::endl;
     }
 
-    Foo(const Foo&& other)
+    Foo(Foo&& other) noexcept
         : id(other.id) {
         // Copy the id.
         std::cout << "Move-constructed Foo-" << id << std::endl;
@@ -240,6 +240,11 @@ void can_not_throw() noexcept {
 //   - swap member functions
 //   If these functions can throw, it's almost impossible to make other functions
 //   exception safe.
+//
+//   Writing exception safe code often involves updating the state of the program
+//   using only operations that are guaranteed not to throw exceptions.
+//   How can we be sure that nothing will be thrown while updating the state
+//   of the program? swap member functions are very helpful for this.
 
 // Failure in constructors.
 //

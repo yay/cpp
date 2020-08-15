@@ -11,6 +11,8 @@ public:
         memcpy(m_Data, string, m_Size);
     }
 
+    // Copying is a const operation on `other`, so copy construction/assignment functions
+    // should always take their parameter by const&.
     String(const String &other) { // copy-constructor
         printf("String copy-constructor call\n");
         m_Size = other.m_Size;
@@ -18,6 +20,8 @@ public:
         memcpy(m_Data, other.m_Data, m_Size);
     }
 
+    // Move is a noexcept, non-const operation on `other`, so move construction/assignment
+    // functions should always be noexcept and take their parameter by (non-const) &&.
     String(String &&other) noexcept { // move-constructor
         printf("String copy-constructor call\n");
         m_Size = other.m_Size;
