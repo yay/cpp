@@ -3,6 +3,7 @@
 #include <iostream>
 #include <optional>
 #include <vector>
+#include <assert.h>
 
 static int FooId = 0;
 struct Foo {
@@ -14,31 +15,21 @@ struct Foo {
     Foo() {}
 
     Foo(double x, double y, double z)
-        : x(x)
-        , y(y)
-        , z(z)
-    {
+        : x(x), y(y), z(z) {
         std::cout << "Constructed Foo-" << id << std::endl;
     }
 
     Foo(const Foo& other)
-        : x(other.x)
-        , y(other.y)
-        , z(other.z)
-    {
+        : x(other.x), y(other.y), z(other.z) {
         std::cout << "Copy-constructed Foo-" << id << std::endl;
     }
 
     Foo(const Foo&& other)
-        : x(other.x)
-        , y(other.y)
-        , z(other.z)
-    {
+        : x(other.x), y(other.y), z(other.z) {
         std::cout << "Move-constructed Foo-" << id << std::endl;
     }
 
-    Foo& operator=(Foo&& other)
-    {
+    Foo& operator=(Foo&& other) {
         std::cout << "Moved Foo-" << other.id << std::endl;
         // The left hand side fields here are all zero initialized.
         id = other.id;
@@ -48,8 +39,7 @@ struct Foo {
         return *this;
     }
 
-    ~Foo()
-    {
+    ~Foo() {
         std::cout << "Destroyed Foo-" << id << std::endl;
     }
 };
@@ -61,13 +51,11 @@ class Array {
 public:
     Array() = default;
 
-    ~Array()
-    {
+    ~Array() {
         std::free(_storage);
     }
 
-    bool push(T& value)
-    {
+    bool push(T& value) {
         if (_size >= _capacity) {
             if (!grow_capacity()) {
                 return false;
@@ -78,8 +66,7 @@ public:
         return true;
     }
 
-    bool push(T&& value)
-    {
+    bool push(T&& value) {
         if (_size >= _capacity) {
             if (!grow_capacity()) {
                 return false;
@@ -90,8 +77,7 @@ public:
         return true;
     }
 
-    std::optional<T> pop()
-    {
+    std::optional<T> pop() {
         if (size() > 0) {
             _size -= 1;
             return std::move(_storage[_size]);
@@ -99,24 +85,23 @@ public:
         return {};
     }
 
-    std::optional<T> first()
-    {
+    // first() and last() return optional just to show how they
+    // could be used and why it's not ideal to use them here.
+    std::optional<T> first() {
         if (size() > 0) {
             return _storage[0];
         }
         return {};
     }
 
-    std::optional<T> last()
-    {
+    std::optional<T> last() {
         if (size() > 0) {
             return _storage[_size - 1];
         }
         return {};
     }
 
-    bool compact()
-    {
+    bool compact() {
         auto new_capacity = std::pow(2, std::ceil(std::log2(_size)));
         if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
             return false;
@@ -125,11 +110,8 @@ public:
         return true;
     }
 
-    std::optional<T> operator[](size_t index)
-    {
-        if (index < 0 || index >= size()) {
-            return {};
-        }
+    const T& operator[](size_t index) {
+        assert(index < size() && index >= 0);
         return _storage[index];
     }
 
@@ -139,11 +121,10 @@ public:
 
 private:
     T* _storage;
-    size_t _size { 0 };
-    size_t _capacity { 0 };
+    size_t _size{0};
+    size_t _capacity{0};
 
-    bool grow_capacity()
-    {
+    bool grow_capacity() {
         if (_capacity > 0) {
             auto new_capacity = _capacity * 2;
             if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
@@ -165,8 +146,7 @@ private:
     }
 };
 
-void pop_value(Array<int>& array)
-{
+void pop_value(Array<int>& array) {
     if (auto value = array.pop()) {
         std::cout << "Popped value: " << *value << std::endl;
     } else {
@@ -174,15 +154,14 @@ void pop_value(Array<int>& array)
     }
 }
 
-int main(int, char**)
-{
+int main(int, char**) {
     Array<int> array;
     std::cout << "Last element is over " << array.last().value_or(9000) << std::endl;
     array.push(5);
     array.push(7);
     array.push(9);
-    std::cout << "array[0]: " << array[0].value() << std::endl;
-    std::cout << "array[1]: " << array[1].value() << std::endl;
+    std::cout << "array[0]: " << array[0] << std::endl;
+    std::cout << "array[1]: " << array[1] << std::endl;
 
     auto first = array.first();
     if (first) {
@@ -201,8 +180,11 @@ int main(int, char**)
     pop_value(array);
 
     Array<Foo> fooray;
-    fooray.push(Foo { 1.0, 2.0, 3.0 });
+    fooray.push(Foo{1.0, 2.0, 3.0});
     if (auto first_foo = fooray.pop()) {
         std::cout << "First foo: " << (*first_foo).z << std::endl;
     }
+    fooray.push(Foo{3.0, 5.0, 7.0});
+    std::cout << fooray[0].y << std::endl;
+    std::cout << fooray[1].y << std::endl;
 }

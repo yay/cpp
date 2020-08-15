@@ -1,5 +1,16 @@
 #include <iostream>
 
+// A reference implemented under the covers as a pointer,
+// but semantically it usually behaves like an alias
+// because most uses of its name automatically dereference it.
+
+// References were invented for function parameter/return types.
+// For example:
+// - if `+` operator is overloaded and we wanted to pass by pointer,
+//   we would have to write the following code: `&a + &b`
+// - if `[]` operator is overloaded and we wanted to return by pointer,
+//   we would have to write the following code: `*str[0] = a`
+
 int main(int, char**) {
     int i {5};
     int *pi = new int;
