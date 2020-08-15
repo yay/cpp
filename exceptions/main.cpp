@@ -4,6 +4,7 @@
 // #include <new>
 // #include <typeinfo>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <tuple>
 #include <assert.h>
@@ -203,8 +204,63 @@ void can_not_throw() noexcept {
 // Code is called "exception neutral" when it's set up in such a way that it
 // doesn't know if an exception is thrown or not, but it will respond appropriately
 // regardless (for example, rethrow).
+
 // Code is called "exception safe" if it keeps the program in a consistent state
 // even if a throw occurs.
+
+// Types of guarantees:
+//
+// - Basic
+//
+//   The program state may change, but it will remain self-consistent,
+//   that is to say a function that throws won't cause a resource leak
+//   and won't leave an object in an invalid state.
+//
+// - Strong
+//
+//   If a function throws an exception the program's state remains unchanged
+//   (as if a function wasn't called). That is to say a function has a
+//   "commit or rollback" semantics.
+//
+// - Nothrow
+//
+//   No exceptions will ever propagate from the function.
+//   If a throw occurs during function execution, the function will catch
+//   the exception and deal with it within the function.
+
+// Failure in constructors.
+//
+// When constructor throws an exception it is interrupted before it finishes.
+// The destructor never runs, so the constructor needs to clean up resources
+// that were allocated before the throw. Ideally such resources would be wrapped
+// into their own classes, so that the cleanup would happen automatically.
+
+const char* get_text() {
+    throw std::logic_error("Whoops!");
+    return "9000";
+}
+
+void basic_guarantee() {
+    std::ofstream output("output.txt");
+    if (output.is_open()) {
+        output << "The value is: ";
+        // If get_text() throws, the output will contain 'T' (for some reason).
+        // The outcome might depend on environment.
+        // output << get_text();
+
+        // So we do this instead:
+        try {
+            output << get_text();
+        } catch (...) {
+            // Rethrowing without closing first
+            // will also make the output contain 'T'.
+            output.close();
+            throw;
+        }
+    } else {
+        std::cout << "Couldn't open file" << std::endl;
+    }
+}
 
 int main(int, char**) {
     try {
