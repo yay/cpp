@@ -109,7 +109,7 @@ void catch_everything() {
         throw "LOL";
         throw std::logic_error("Duh");
     } catch (...) {
-        std::cout << "Caught something ¯\\_(ツ)_/¯" << std::endl;
+        std::cout << u8R"(Caught something ¯\_(ツ)_/¯)" << std::endl;
     }
     // The above is rarely used. Usually something like this is done:
     auto heap_int = new int;
@@ -221,6 +221,7 @@ void can_not_throw() noexcept {
 //   If a function throws an exception the program's state remains unchanged
 //   (as if a function wasn't called). That is to say a function has a
 //   "commit or rollback" semantics.
+//
 //   To provide the strong guarantee, break the function into parts.
 //   Part 1. Do everything that could throw and store the results in local variables.
 //           If an exception is thrown, the local variables will be cleaned up
@@ -232,6 +233,13 @@ void can_not_throw() noexcept {
 //   No exceptions will ever propagate from the function.
 //   If a throw occurs during function execution, the function will catch
 //   the exception and deal with it within the function.
+//
+//   Some functions should never throw, notably:
+//   - destructors
+//   - operator delete
+//   - swap member functions
+//   If these functions can throw, it's almost impossible to make other functions
+//   exception safe.
 
 // Failure in constructors.
 //
@@ -239,6 +247,10 @@ void can_not_throw() noexcept {
 // The destructor never runs, so the constructor needs to clean up resources
 // that were allocated before the throw. Ideally such resources would be wrapped
 // into their own classes, so that the cleanup would happen automatically.
+//
+// C++ only allows one exception to be thrown at a time.
+// Destructors are called while unwinding the stack.
+// If an exception is thrown while unwinding the stack, std::terminate is called.
 
 const char* get_text() {
     throw std::logic_error("Whoops!");
@@ -277,15 +289,13 @@ void strong_guarantee() {
     
     std::ofstream output("output.txt");
     if (output.is_open()) {
+        // Assuming << doesn't throw for the purposes of this demonstration.
         output << "The value is: ";
         output << temp_text;
     }
 }
 
 int main(int, char**) {
-    strong_guarantee();
-    return 0;
-
     try {
         throw_everything();
     } catch (std::exception& error) {
