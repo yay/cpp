@@ -221,6 +221,11 @@ void can_not_throw() noexcept {
 //   If a function throws an exception the program's state remains unchanged
 //   (as if a function wasn't called). That is to say a function has a
 //   "commit or rollback" semantics.
+//   To provide the strong guarantee, break the function into parts.
+//   Part 1. Do everything that could throw and store the results in local variables.
+//           If an exception is thrown, the local variables will be cleaned up
+//           by their destructors. The program's state remains unchanged.
+//   Part 2. Update the state of the program, using only operations that can't throw.
 //
 // - Nothrow
 //
@@ -240,6 +245,9 @@ const char* get_text() {
     return "9000";
 }
 
+// If basic_guarantee() fails, the file will be created and will
+// contain partial data. But the resouces will still be cleaned
+// up correctly.
 void basic_guarantee() {
     std::ofstream output("output.txt");
     if (output.is_open()) {
@@ -262,7 +270,22 @@ void basic_guarantee() {
     }
 }
 
+// If strong_guarantee() fails, it's as if nothing has happened.
+// The file won't be even created.
+void strong_guarantee() {
+    auto temp_text = get_text();
+    
+    std::ofstream output("output.txt");
+    if (output.is_open()) {
+        output << "The value is: ";
+        output << temp_text;
+    }
+}
+
 int main(int, char**) {
+    strong_guarantee();
+    return 0;
+
     try {
         throw_everything();
     } catch (std::exception& error) {
