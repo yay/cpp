@@ -11,9 +11,9 @@
 static int FooId = 0;
 struct Foo {
     int id = ++FooId;
-    double x;
-    double y;
-    double z;
+    double x{0};
+    double y{0};
+    double z{0};
 
     Foo() {}
 
@@ -55,6 +55,11 @@ struct Foo {
     ~Foo() {
         std::cout << "Destroyed Foo-" << id << std::endl;
     }
+
+    friend std::ostream& operator<<(std::ostream& out, const Foo& foo) {
+        out << "Foo(" << foo.x << ", " << foo.y << ", " << foo.z << ")";
+        return out;
+    }
 };
 
 // https://www.boost.org/doc/libs/1_65_0/libs/optional/doc/html/boost_optional/tutorial/performance_considerations.html
@@ -85,7 +90,7 @@ public:
                 return false;
             }
         }
-        _storage[_size] = std::move(value);
+        _storage[_size] = value;
         _size += 1;
         return true;
     }
@@ -123,35 +128,48 @@ public:
         return true;
     }
 
-    const T& operator[](size_t index) {
+    const T& operator[](size_t index) const {
         assert(index < size() && index >= 0);
         return _storage[index];
     }
 
-    inline size_t size() { return _size; }
+    inline size_t size() const { return _size; }
 
     inline size_t capacity() { return _capacity; } // zero or a number that is a power of two
 
+    friend std::ostream& operator<<(std::ostream& out, const Array& array) {
+        out << "Array(" << std::endl;
+        auto ln = array.size();
+        for (size_t i = 0; i < ln; i++) {
+            std::cout << "\t" << array[i] << std::endl;
+        }
+        out << ")";
+        return out;
+    }
+
 private:
-    T* _storage;
+    T* _storage{nullptr};
     size_t _size{0};
     size_t _capacity{0};
 
     bool grow_capacity() {
         if (_capacity > 0) {
             auto new_capacity = _capacity * 2;
-            if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
+            auto storage = std::realloc(_storage, new_capacity * sizeof(T));
+            if (storage == nullptr) {
                 return false;
             }
+            _storage = static_cast<T*>(storage);
             std::cout << "Reallocated dynamic array storage to hold up to " << new_capacity
                       << " elements" << std::endl;
             _capacity *= new_capacity;
         } else {
             auto new_capacity = 1;
-            _storage = static_cast<T*>(std::malloc(new_capacity * sizeof(T)));
-            if (_storage == nullptr) {
+            auto storage = std::malloc(new_capacity * sizeof(T));
+            if (storage == nullptr) {
                 return false;
             }
+            _storage = static_cast<T*>(storage);
             std::cout << "Allocated dynamic array storage to hold 1 element" << std::endl;
             _capacity = new_capacity;
         }
@@ -181,7 +199,16 @@ void handler(int sig) {
 }
 
 int main(int, char**) {
-    signal(SIGSEGV, handler);
+    signal(SIGSEGV, handler); // print stack trace for segmentation faults
+
+    // Array<Foo> fooray;
+    // fooray.push(Foo{1.0, 2.0, 3.0});
+    // if (auto first_foo = fooray.pop()) {
+    //     std::cout << "First foo: " << (*first_foo).z << std::endl;
+    // }
+    // fooray.push(Foo{3.0, 5.0, 7.0});
+    // fooray.push(Foo{3.0, 5.0, 7.0});
+    // return 0;
 
     Array<int> array;
     std::cout << "Last element is over " << array.last().value_or(9000) << std::endl;
@@ -216,6 +243,8 @@ int main(int, char**) {
         std::cout << "First foo: " << (*first_foo).z << std::endl;
     }
     fooray.push(Foo{3.0, 5.0, 7.0});
-    fooray.push(Foo{3.0, 5.0, 7.0});
-    std::cout << fooray[0].y << std::endl;
+    fooray.push(Foo{9.0, 6.0, 3.0});
+    
+    std::cout << fooray[0] << std::endl;
+    std::cout << fooray << std::endl;
 }
