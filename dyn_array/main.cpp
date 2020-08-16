@@ -120,7 +120,7 @@ public:
     }
 
     bool compact() {
-        auto new_capacity = std::pow(2, std::ceil(std::log2(_size)));
+        size_t new_capacity = std::pow(2, std::ceil(std::log2(_size)));
         if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
             return false;
         }
@@ -154,18 +154,18 @@ private:
 
     bool grow_capacity() {
         if (_capacity > 0) {
-            auto new_capacity = _capacity * 2;
-            auto storage = std::realloc(_storage, new_capacity * sizeof(T));
+            size_t new_capacity = _capacity * 2;
+            void* storage = std::realloc(_storage, new_capacity * sizeof(T));
             if (storage == nullptr) {
                 return false;
             }
             _storage = static_cast<T*>(storage);
             std::cout << "Reallocated dynamic array storage to hold up to " << new_capacity
                       << " elements" << std::endl;
-            _capacity *= new_capacity;
+            _capacity = new_capacity;
         } else {
-            auto new_capacity = 1;
-            auto storage = std::malloc(new_capacity * sizeof(T));
+            size_t new_capacity = 1;
+            void* storage = std::malloc(new_capacity * sizeof(T));
             if (storage == nullptr) {
                 return false;
             }
@@ -201,46 +201,41 @@ void handler(int sig) {
 int main(int, char**) {
     signal(SIGSEGV, handler); // print stack trace for segmentation faults
 
-    // Array<int> array;
-    // std::cout << "Last element is over " << array.last().value_or(9000) << std::endl;
-    // array.push(5);
-    // array.push(7);
-    // array.push(9);
-    // std::cout << "array[0]: " << array[0] << std::endl;
-    // std::cout << "array[1]: " << array[1] << std::endl;
+    Array<int> array;
+    std::cout << "Last element is over " << array.last().value_or(9000) << std::endl;
+    array.push(5);
+    array.push(7);
+    array.push(9);
+    std::cout << "array[0]: " << array[0] << std::endl;
+    std::cout << "array[1]: " << array[1] << std::endl;
 
-    // auto first = array.first();
-    // if (first) {
-    //     std::cout << "First: " << first.value() << std::endl;
-    // }
-    // if (auto last = array.last()) {
-    //     std::cout << "Last: " << *last << std::endl;
-    // }
-
-    // std::cout << "Length: " << array.size() << std::endl;
-    // std::cout << "Capacity: " << array.capacity() << std::endl;
-
-    // pop_value(array);
-    // pop_value(array);
-    // pop_value(array);
-    // pop_value(array);
-
-    // Foo f1{7.0, 8.0, 9.0};
-    // Foo f2{f1};
-
-    // Array<Foo> fooray;
-    // fooray.push(Foo{1.0, 2.0, 3.0});
-    // if (auto first_foo = fooray.pop()) {
-    //     std::cout << "First foo: " << (*first_foo).z << std::endl;
-    // }
-    // fooray.push(Foo{3.0, 5.0, 7.0});
-    // fooray.push(Foo{9.0, 6.0, 3.0});
-
-    // std::cout << fooray[0] << std::endl;
-    // std::cout << fooray << std::endl;
-
-    Array<const char*> arr;
-    for (size_t i = 0; i < 1'000'000'000; i++) {
-        arr.push("Vitaly");
+    auto first = array.first();
+    if (first) {
+        std::cout << "First: " << first.value() << std::endl;
     }
+    if (auto last = array.last()) {
+        std::cout << "Last: " << *last << std::endl;
+    }
+
+    std::cout << "Length: " << array.size() << std::endl;
+    std::cout << "Capacity: " << array.capacity() << std::endl;
+
+    pop_value(array);
+    pop_value(array);
+    pop_value(array);
+    pop_value(array);
+
+    Foo f1{7.0, 8.0, 9.0};
+    Foo f2{f1};
+
+    Array<Foo> fooray;
+    fooray.push(Foo{1.0, 2.0, 3.0});
+    if (auto first_foo = fooray.pop()) {
+        std::cout << "First foo: " << (*first_foo).z << std::endl;
+    }
+    fooray.push(Foo{3.0, 5.0, 7.0});
+    fooray.push(Foo{9.0, 6.0, 3.0});
+
+    std::cout << fooray[0] << std::endl;
+    std::cout << fooray << std::endl;
 }
