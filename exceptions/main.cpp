@@ -3,11 +3,11 @@
 // Some other standard exceptions are declared here:
 // #include <new>
 // #include <typeinfo>
-#include <iostream>
+#include <assert.h>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <tuple>
-#include <assert.h>
 
 // Jonathan Blow's comments:
 
@@ -291,12 +291,56 @@ void basic_guarantee() {
 // The file won't be even created.
 void strong_guarantee() {
     auto temp_text = get_text();
-    
+
     std::ofstream output("output.txt");
     if (output.is_open()) {
         // Assuming << doesn't throw for the purposes of this demonstration.
         output << "The value is: ";
         output << temp_text;
+    }
+}
+
+void nothrow_guarantee() {
+    class little {
+    public:
+        little(double d) : d(d) {}
+        void swap(little& other) noexcept {
+            std::swap(d, other.d);
+        }
+        static little might_throw() {
+            throw std::logic_error("🤮");
+            return little(7.0);
+        }
+
+    private:
+        double d;
+    };
+
+    class big {
+    public:
+        void munge() {
+            little temp = little::might_throw(); // if this throws, l is unchanged
+            l.swap(temp); // if the above didn't throw, safely swap the temp to l
+            // Now l's old state is in temp, so when we leave the function
+            // the old state of l is cleaned up by temp's destructor.
+        }
+
+        void swap(big& other) noexcept {
+            // built-in type, never throws
+            std::swap(i, other.i);
+            // for data members of class types, implement `swap` that never throws
+            l.swap(other.l);
+        }
+    private:
+        int i = 10;
+        little l{5.0};
+    };
+
+    big b;
+    try {
+        b.munge();
+    } catch (std::exception& error) {
+        std::cout << "Caught some error: " << error.what() << std::endl;
     }
 }
 
