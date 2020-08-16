@@ -4,6 +4,9 @@
 #include <optional>
 #include <vector>
 #include <assert.h>
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
 
 static int FooId = 0;
 struct Foo {
@@ -31,8 +34,16 @@ struct Foo {
         std::cout << "Move-constructed Foo-" << id << std::endl;
     }
 
+    Foo& operator=(const Foo& other) {
+        std::cout << "Copy-assigned Foo-" << other.id << std::endl;
+        x = other.x;
+        y = other.y;
+        z = other.z;
+        return *this;
+    }
+
     Foo& operator=(Foo&& other) {
-        std::cout << "Moved Foo-" << other.id << std::endl;
+        std::cout << "Move-assigned Foo-" << other.id << std::endl;
         // The left hand side fields here are all zero initialized.
         id = other.id;
         x = other.x;
@@ -82,7 +93,7 @@ public:
     std::optional<T> pop() {
         if (size() > 0) {
             _size -= 1;
-            return std::move(_storage[_size]);
+            return _storage[_size];
         }
         return {};
     }
@@ -156,7 +167,22 @@ void pop_value(Array<int>& array) {
     }
 }
 
+void handler(int sig) {
+  void *array[10];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 20);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+
 int main(int, char**) {
+    signal(SIGSEGV, handler);
+
     Array<int> array;
     std::cout << "Last element is over " << array.last().value_or(9000) << std::endl;
     array.push(5);
@@ -190,6 +216,6 @@ int main(int, char**) {
         std::cout << "First foo: " << (*first_foo).z << std::endl;
     }
     fooray.push(Foo{3.0, 5.0, 7.0});
+    fooray.push(Foo{3.0, 5.0, 7.0});
     std::cout << fooray[0].y << std::endl;
-    std::cout << fooray[1].y << std::endl;
 }
