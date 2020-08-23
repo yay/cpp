@@ -55,9 +55,10 @@
 
 void throw_everything() {
     try {
-        throw 5;
+        // Since we can throw values of any type
+        throw 5; // dynamic allocation happens even for primitive types
         std::cout << "You'll never see this" << std::endl;
-    } catch (int error) {
+    } catch (int& error) { // then RTTI is used to find out the type of variable behind the pointer
         std::cout << "Caught: " << error << std::endl;
     }
 
@@ -69,7 +70,7 @@ void throw_everything() {
 
     try {
         throw true;
-    } catch (bool error) {
+    } catch (bool& error) {
         std::cout << "Caught: " << (error ? "true" : "false") << std::endl;
     }
 
@@ -320,7 +321,7 @@ void nothrow_guarantee() {
     public:
         void munge() {
             little temp = little::might_throw(); // if this throws, l is unchanged
-            l.swap(temp); // if the above didn't throw, safely swap the temp to l
+            l.swap(temp);                        // if the above didn't throw, safely swap the temp to l
             // Now l's old state is in temp, so when we leave the function
             // the old state of l is cleaned up by temp's destructor.
         }
@@ -331,6 +332,7 @@ void nothrow_guarantee() {
             // for data members of class types, implement `swap` that never throws
             l.swap(other.l);
         }
+
     private:
         int i = 10;
         little l{5.0};
