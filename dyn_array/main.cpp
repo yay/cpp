@@ -121,8 +121,6 @@ public:
 
     bool compact() {
         size_t new_capacity = std::pow(2, std::ceil(std::log2(_size)));
-        // What if the objects inside the vector are not referenced elsewhere?
-        // Will their destructors be called?
         if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
             return false;
         }
