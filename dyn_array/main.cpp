@@ -121,6 +121,8 @@ public:
 
     bool compact() {
         size_t new_capacity = std::pow(2, std::ceil(std::log2(_size)));
+        // What if the objects inside the vector are not referenced elsewhere?
+        // Will their destructors be called?
         if (std::realloc(_storage, new_capacity * sizeof(T)) == nullptr) {
             return false;
         }
@@ -129,7 +131,7 @@ public:
     }
 
     const T& operator[](size_t index) const {
-        assert(index < size() && index >= 0);
+        assert(index < size());
         return _storage[index];
     }
 
@@ -155,21 +157,27 @@ private:
     bool grow_capacity() {
         if (_capacity > 0) {
             size_t new_capacity = _capacity * 2;
-            void* storage = std::realloc(_storage, new_capacity * sizeof(T));
+            // Can't use std::realloc here because we are potentially moving objects
+            // of non-trivially copyable type.
+            // T* storage = static_cast<T*>(std::realloc(_storage, new_capacity * sizeof(T)));
+            T* storage = static_cast<T*>(std::malloc(new_capacity * sizeof(T)));
             if (storage == nullptr) {
                 return false;
             }
-            _storage = static_cast<T*>(storage);
+            for (size_t i = 0; i < _size; i++) {
+                storage[i] = _storage[i];
+            }
+            _storage = storage;
             std::cout << "Reallocated dynamic array storage to hold up to " << new_capacity
                       << " elements" << std::endl;
             _capacity = new_capacity;
         } else {
             size_t new_capacity = 1;
-            void* storage = std::malloc(new_capacity * sizeof(T));
+            T* storage = static_cast<T*>(std::malloc(new_capacity * sizeof(T)));
             if (storage == nullptr) {
                 return false;
             }
-            _storage = static_cast<T*>(storage);
+            _storage = storage;
             std::cout << "Allocated dynamic array storage to hold 1 element" << std::endl;
             _capacity = new_capacity;
         }
