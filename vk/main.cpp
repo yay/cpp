@@ -53,19 +53,23 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 class TriangleApp {
 public:
     void run() {
-        initWindow();
-        initVulkan();
+        setupWindow();
+        setupVulkan();
+
         mainLoop();
-        cleanup();
+
+        cleanupVulkan();
+        cleanupWindow();
     }
 
 private:
     GLFWwindow* window;
     VkInstance instance;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkDevice device;
     VkDebugUtilsMessengerEXT debugMessenger;
 
-    void initWindow() {
+    void setupWindow() {
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -73,10 +77,22 @@ private:
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
     }
 
-    void initVulkan() {
+    void cleanupWindow() {
+        glfwDestroyWindow(window);
+        glfwTerminate();
+    }
+
+    void setupVulkan() {
         createInstance();
         setupDebugMessenger();
         pickPhysicalDevice();
+        createLogicalDevice();
+    }
+
+    void cleanupVulkan() {
+        destroyLogicalDevice();
+        cleanupDebugMessenger();
+        destroyInstance();
     }
 
     void createInstance() {
@@ -122,6 +138,8 @@ private:
             throw std::runtime_error("Failed to create a Vulkan instance!");
         }
     }
+
+    void destroyInstance() { vkDestroyInstance(instance, nullptr); }
 
     void pickPhysicalDevice() {
         uint32_t deviceCount = 0;
@@ -176,7 +194,7 @@ private:
             if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 indices.graphicsFamily = i;
             }
-            
+
             if (indices.isComplete()) {
                 break;
             }
@@ -186,6 +204,41 @@ private:
 
         return indices;
     }
+
+    void createLogicalDevice() {
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+        // Don't really need more than one queue because we can create all of the command buffers
+        // on multiple threads and then submit them all at once on the main thread
+        // with a single low-overhead call.
+        queueCreateInfo.queueCount = 1;
+        float queuePriority = 1.0f;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+
+        VkPhysicalDeviceFeatures deviceFeatures{};
+
+        VkDeviceCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+        createInfo.pQueueCreateInfos = &queueCreateInfo;
+        createInfo.queueCreateInfoCount = 1;
+
+        createInfo.pEnabledFeatures = &deviceFeatures;
+
+        // An example of a device specific extension is VK_KHR_swapchain,
+        // which allows you to present rendered images from that device to windows.
+        // It is possible that there are Vulkan devices in the system that lack this ability,
+        // for example because they only support compute operations.
+
+        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create a logical device!");
+        }
+    }
+
+    void destroyLogicalDevice() { vkDestroyDevice(device, nullptr); }
 
     bool checkValidationLayerSupport() {
         uint32_t layerCount;
@@ -275,15 +328,6 @@ private:
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
         }
-    }
-
-    void cleanup() {
-        cleanupDebugMessenger();
-        vkDestroyInstance(instance, nullptr);
-
-        glfwDestroyWindow(window);
-
-        glfwTerminate();
     }
 };
 
