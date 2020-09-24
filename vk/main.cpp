@@ -64,9 +64,11 @@ public:
 
 private:
     GLFWwindow* window;
+
     VkInstance instance;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device;
+    VkQueue graphicsQueue;
     VkDebugUtilsMessengerEXT debugMessenger;
 
     void setupWindow() {
@@ -236,6 +238,8 @@ private:
         if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create a logical device!");
         }
+
+        vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     }
 
     void destroyLogicalDevice() { vkDestroyDevice(device, nullptr); }
@@ -330,33 +334,6 @@ private:
         }
     }
 };
-
-int mainLoop() {
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Vulkan", nullptr, nullptr);
-
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
-    std::cout << extensionCount << " extensions supported\n";
-
-    glm::mat4 matrix;
-    glm::vec4 vec;
-    auto test = matrix * vec;
-
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-    }
-
-    glfwDestroyWindow(window);
-
-    glfwTerminate();
-
-    return EXIT_SUCCESS;
-}
 
 int main() {
     TriangleApp app;
