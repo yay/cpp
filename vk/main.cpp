@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <vector>
 
 const uint32_t WIDTH = 800;
@@ -23,9 +24,12 @@ const bool enableValidationLayers = true;
 #endif
 
 struct QueueFamilyIndices {
+    // It's possible that the queue families supporting drawing commands
+    // and the ones supporting presentation do not overlap.
     std::optional<uint32_t> graphicsFamily;
+    std::optional<uint32_t> presentFamily;
 
-    bool isComplete() { return graphicsFamily.has_value(); }
+    bool isComplete() { return graphicsFamily.has_value() && presentFamily.has_value(); }
 };
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -69,7 +73,9 @@ private:
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device;
     VkQueue graphicsQueue;
+    VkQueue presentQueue;
     VkDebugUtilsMessengerEXT debugMessenger;
+    VkSurfaceKHR surface;
 
     void setupWindow() {
         glfwInit();
@@ -87,6 +93,7 @@ private:
     void setupVulkan() {
         createInstance();
         setupDebugMessenger();
+        createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
     }
@@ -94,6 +101,7 @@ private:
     void cleanupVulkan() {
         destroyLogicalDevice();
         cleanupDebugMessenger();
+        destroySurface();
         destroyInstance();
     }
 
@@ -142,6 +150,15 @@ private:
     }
 
     void destroyInstance() { vkDestroyInstance(instance, nullptr); }
+
+    void createSurface() {
+        // This uses different implementation for each supported platform.
+        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create window surface!");
+        }
+    }
+
+    void destroySurface() { vkDestroySurfaceKHR(instance, surface, nullptr); }
 
     void pickPhysicalDevice() {
         uint32_t deviceCount = 0;
@@ -197,6 +214,14 @@ private:
                 indices.graphicsFamily = i;
             }
 
+            // Since the presentation is a queue-specific feature, the problem is about
+            // finding a queue family that supports presenting to the surface we created.
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+            if (presentSupport) {
+                indices.presentFamily = i;
+            }
+
             if (indices.isComplete()) {
                 break;
             }
@@ -210,36 +235,40 @@ private:
     void createLogicalDevice() {
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
-        VkDeviceQueueCreateInfo queueCreateInfo{};
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-        // Don't really need more than one queue because we can create all of the command buffers
-        // on multiple threads and then submit them all at once on the main thread
-        // with a single low-overhead call.
-        queueCreateInfo.queueCount = 1;
-        float queuePriority = 1.0f;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
-        VkPhysicalDeviceFeatures deviceFeatures{};
+        float queuePriority = 1.0f;
+        for (uint32_t queueFamily : uniqueQueueFamilies) {
+            VkDeviceQueueCreateInfo queueCreateInfo{};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = queueFamily;
+            // Don't really need more than one queue because we can create all of the command buffers
+            // on multiple threads and then submit them all at once on the main thread
+            // with a single low-overhead call.
+            queueCreateInfo.queueCount = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+            queueCreateInfos.push_back(queueCreateInfo);
+        }
 
         VkDeviceCreateInfo createInfo{};
+        VkPhysicalDeviceFeatures deviceFeatures{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
-        createInfo.pQueueCreateInfos = &queueCreateInfo;
-        createInfo.queueCreateInfoCount = 1;
-
+        createInfo.pQueueCreateInfos = queueCreateInfos.data();
+        createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pEnabledFeatures = &deviceFeatures;
+        createInfo.enabledExtensionCount = 0;
 
         // An example of a device specific extension is VK_KHR_swapchain,
         // which allows you to present rendered images from that device to windows.
         // It is possible that there are Vulkan devices in the system that lack this ability,
         // for example because they only support compute operations.
-
         if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create a logical device!");
         }
 
         vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+        vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     }
 
     void destroyLogicalDevice() { vkDestroyDevice(device, nullptr); }
@@ -271,6 +300,7 @@ private:
 
     std::vector<const char*> getRequiredExtensions() {
         uint32_t glfwExtensionCount = 0;
+        // This includes platform-specific extensions needed to create a window surface.
         const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
