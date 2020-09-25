@@ -16,6 +16,7 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -191,8 +192,9 @@ private:
         vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
         QueueFamilyIndices indices = findQueueFamilies(device);
-
-        bool isSuitable = deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && indices.isComplete();
+        bool isDedicatedGPU = deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+        bool extensionsSupported = checkDeviceExtensionSupport(device);
+        bool isSuitable = isDedicatedGPU && indices.isComplete() && extensionsSupported;
 
         std::cout << "Picking the following device: " << deviceProperties.deviceName << std::endl;
 
@@ -230,6 +232,25 @@ private:
         }
 
         return indices;
+    }
+
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+        std::cout << "Supported extensions:" << std::endl;
+        for (const auto& extension : availableExtensions) {
+            std::cout << extension.extensionName << std::endl;
+            requiredExtensions.erase(extension.extensionName);
+        }
+        std::cout << std::endl;
+
+        return requiredExtensions.empty();
     }
 
     void createLogicalDevice() {
@@ -312,6 +333,7 @@ private:
         for (const char* extension : extensions) {
             std::cout << extension << std::endl;
         }
+        std::cout << std::endl;
 
         return extensions;
     }
