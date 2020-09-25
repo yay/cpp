@@ -49,23 +49,23 @@ struct SwapChainSupportDetails {
     std::vector<VkSurfaceFormatKHR> formats; // pixel format, color space
     std::vector<VkPresentModeKHR> presentModes; // presentation modes
 
-    SwapChainSupportDetails(VkPhysicalDevice device, VkSurfaceKHR surface) {
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &this->capabilities);
+    SwapChainSupportDetails(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &this->capabilities);
 
         uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
 
         if (formatCount != 0) {
             this->formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, this->formats.data());
+            vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, this->formats.data());
         }
 
         uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
 
         if (presentModeCount != 0) {
             this->presentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, this->presentModes.data());
+            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, this->presentModes.data());
         };
     }
 };
@@ -112,6 +112,10 @@ private:
     VkDevice device;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
+    VkSwapchainKHR swapChain;
+    std::vector<VkImage> swapChainImages;
+    VkFormat swapChainImageFormat;
+    VkExtent2D swapChainExtent;
     VkDebugUtilsMessengerEXT debugMessenger;
     VkSurfaceKHR surface;
 
@@ -386,11 +390,84 @@ private:
     void destroyLogicalDevice() { vkDestroyDevice(device, nullptr); }
 
     void createSwapChain() {
-        
+        SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
+
+        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+
+        // We may sometimes have to wait on the driver to complete internal operations
+        // before we can acquire another image to render to, so we request one more than the minimum.
+        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+
+        if (swapChainSupport.capabilities.maxImageCount > 0 &&
+            imageCount > swapChainSupport.capabilities.maxImageCount) {
+            imageCount = swapChainSupport.capabilities.maxImageCount;
+        }
+
+        VkSwapchainCreateInfoKHR createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        createInfo.surface = surface;
+        createInfo.minImageCount = imageCount;
+        createInfo.imageFormat = surfaceFormat.format;
+        createInfo.imageColorSpace = surfaceFormat.colorSpace;
+        createInfo.imageExtent = extent;
+        // The imageArrayLayers specifies the amount of layers each image consists of.
+        // This is always 1 unless you are developing a stereoscopic 3D application.
+        createInfo.imageArrayLayers = 1;
+        // Render directly to images, which means that they're used as color attachment.
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+        if (indices.graphicsFamily != indices.presentFamily) {
+            // Images can be used across multiple queue families without explicit ownership transfers.
+            createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+        } else {
+            // An image is owned by one queue family at a time and ownership must be explicitly
+            // transferred before using it in another queue family.
+            createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // best performance
+            createInfo.queueFamilyIndexCount = 0;     // optional
+            createInfo.pQueueFamilyIndices = nullptr; // optional
+        }
+
+        // Don't use any transformations.
+        createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+
+        // Ignore the alpha channel.
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+
+        createInfo.presentMode = presentMode;
+        // Don't care about the color of pixels that are obscured,
+        // for example because another window is in front of them.
+        createInfo.clipped = VK_TRUE;
+
+        // With Vulkan it's possible that your swap chain becomes invalid or unoptimized
+        // while your application is running, for example because the window was resized.
+        // In that case the swap chain actually needs to be recreated from scratch and a reference
+        // to the old one must be specified in this field.
+        // https://vulkan-tutorial.com/en/Drawing_a_triangle/Swap_chain_recreation
+        // For now we'll assume that we'll only ever create one swap chain.
+        createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create a swap chain!");
+        }
+
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+        swapChainImages.resize(imageCount);
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+
+        swapChainImageFormat = surfaceFormat.format;
+        swapChainExtent = extent;
     }
 
     void destroySwapChain() {
-
+        // Note: swap chain images are automatically cleaned up once the swap chain has been destroyed.
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
     }
 
     bool checkValidationLayerSupport() {
