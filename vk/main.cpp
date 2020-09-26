@@ -13,6 +13,8 @@
 #include <set>
 #include <vector>
 
+// https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -143,6 +145,7 @@ private:
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createGraphicsPipeline();
     }
 
     void cleanupVulkan() {
@@ -512,6 +515,15 @@ private:
                 throw std::runtime_error("Failed to create image views!");
             }
         }
+    }
+
+    // The graphics pipeline in Vulkan is almost completely immutable,
+    // so you must recreate the pipeline from scratch if you want to change shaders,
+    // bind different framebuffers or change the blend function.
+    // However, because all of the operations you'll be doing in the pipeline are known in advance,
+    // the driver can optimize for it much better.
+    void createGraphicsPipeline() {
+
     }
 
     void destroyImageViews() {
