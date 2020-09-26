@@ -12,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <vector>
+#include <fstream>
 
 // https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
 
@@ -523,7 +524,56 @@ private:
     // However, because all of the operations you'll be doing in the pipeline are known in advance,
     // the driver can optimize for it much better.
     void createGraphicsPipeline() {
+        auto vertShaderCode = readFile("../shaders/triangle-vert.spv");
+        auto fragShaderCode = readFile("../shaders/triangle-frag.spv");
 
+        // The compilation and linking of the SPIR-V bytecode to machine code for execution
+        // by the GPU doesn't happen until the graphics pipeline is created. That means that
+        // we're allowed to destroy the shader modules again as soon as pipeline creation is finished,
+        // which is why we'll make them local variables.
+        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+        VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+        // To actually use the shaders we'll need to assign them to a specific pipeline stage.
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        // It's possible to combine multiple fragment shaders into a single shader module
+        // and use different entry points to differentiate between their behaviors.
+        vertShaderStageInfo.pName = "main"; // entry point
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragShaderStageInfo.module = fragShaderModule;
+        fragShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+        vkDestroyShaderModule(device, fragShaderModule, nullptr);
+        vkDestroyShaderModule(device, vertShaderModule, nullptr);
+    }
+
+    VkShaderModule createShaderModule(const std::vector<char>& code) {
+        // The one catch is that the size of the bytecode is specified in bytes,
+        // but the bytecode pointer is a uint32_t pointer rather than a char pointer.
+        // Therefore we will need to cast the pointer with reinterpret_cast as shown
+        // below. When you perform a cast like this, you also need to ensure that the data satisfies
+        // the alignment requirements of uint32_t. Lucky for us, the data is stored in an std::vector
+        // where the default allocator already ensures that the data satisfies the worst case
+        // alignment requirements.
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create a shader module!");
+        }
+
+        return shaderModule;
     }
 
     void destroyImageViews() {
@@ -576,6 +626,28 @@ private:
         #endif
 
         return extensions;
+    }
+
+    static std::vector<char> readFile(const std::string& filename) {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open file!");
+        }
+
+        // The advantage of starting to read at the end of the file
+        // is that we can use the read position to determine the size of the file
+        // and allocate a buffer:
+        size_t fileSize = (size_t)file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        // Seek back to the beginning of the file and read all of the bytes at once.
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+
+        file.close();
+
+        return buffer;
     }
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
