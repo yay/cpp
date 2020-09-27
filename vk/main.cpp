@@ -145,6 +145,9 @@ private:
     // Command buffers will be automatically freed when their command pool is destroyed.
     std::vector<VkCommandBuffer> commandBuffers;
 
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
@@ -177,9 +180,11 @@ private:
         createFramebuffers();
         createCommandPool();
         createCommandBuffers();
+        createSemaphores();
     }
 
     void cleanupVulkan() {
+        destroySemaphores();
         destroyCommandPool();
         destroyFramebuffers();
         destroyGraphicsPipeline();
@@ -917,6 +922,22 @@ private:
         }
     }
 
+    void createSemaphores() {
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
+            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS) {
+
+            throw std::runtime_error("Failed to create semaphores!");
+        }
+    }
+
+    void destroySemaphores() {
+        vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+    }
+
     VkShaderModule createShaderModule(const std::vector<char>& code) {
         // The one catch is that the size of the bytecode is specified in bytes,
         // but the bytecode pointer is a uint32_t pointer rather than a char pointer.
@@ -1057,6 +1078,49 @@ private:
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+            drawFrame();
+        }
+    }
+
+    void drawFrame() {
+        // The function calls will return before the operations are actually finished
+        // and the order of execution is also undefined. That is unfortunate,
+        // because each of the operations depends on the previous one finishing.
+
+        // There are two ways of synchronizing swap chain events: fences and semaphores.
+        // The difference is that the state of fences can be accessed from your program
+        // using calls like vkWaitForFences and semaphores cannot be. Fences are mainly
+        // designed to synchronize your application itself with rendering operation,
+        // whereas semaphores are used to synchronize operations within or across command queues.
+
+        uint32_t imageIndex;
+        // imageAvailableSemaphore will be signaled when the presentation engine is finished using the image.
+        // That's the point in time where we can start drawing to it.
+        // The last parameter specifies a variable to output the index of the swap chain image that has become
+        // available.
+        vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+        // Configure queue submission and synchronization.
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+        // We want to wait with writing colors to the image until it's available, so we're specifying the stage
+        // of the graphics pipeline that writes to the color attachment.
+        // Each entry in the waitStages array corresponds to the semaphore with the same index in pWaitSemaphores.
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to submit a draw command buffer!");
         }
     }
 };
