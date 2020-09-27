@@ -19,6 +19,9 @@
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
+// How many frames should be processed concurrently.
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 // The Vulkan API is designed around the idea of minimal driver overhead and one of the manifestations
 // of that goal is that there is very limited error checking in the API by default.
 // Validation layers are optional components that hook into Vulkan function calls to apply additional operations.
@@ -145,8 +148,14 @@ private:
     // Command buffers will be automatically freed when their command pool is destroyed.
     std::vector<VkCommandBuffer> commandBuffers;
 
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
+    // Each frame should have its own set of semaphores:
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+    std::vector<VkFence> inFlightFences;
+    std::vector<VkFence> imagesInFlight;
+
+    // To use the right pair of semaphores every time, we need to keep track of the current frame.
+    size_t currentFrame = 0;
 
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
@@ -180,11 +189,11 @@ private:
         createFramebuffers();
         createCommandPool();
         createCommandBuffers();
-        createSemaphores();
+        createSyncObjects();
     }
 
     void cleanupVulkan() {
-        destroySemaphores();
+        destroySyncObjects();
         destroyCommandPool();
         destroyFramebuffers();
         destroyGraphicsPipeline();
@@ -881,8 +890,6 @@ private:
         for (size_t i = 0; i < commandBuffers.size(); i++) {
             VkCommandBufferBeginInfo beginInfo{};
             beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            beginInfo.flags = 0;
-            beginInfo.pInheritanceInfo = nullptr;
 
             // If the command buffer was already recorded once, then a call to vkBeginCommandBuffer
             // will implicitly reset it. It's not possible to append commands to a buffer at a later time.
@@ -922,20 +929,37 @@ private:
         }
     }
 
-    void createSemaphores() {
+    void createSyncObjects() {
+        imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
+
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
-            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS) {
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        // By default, fences are created in the unsignaled state.
+        // That means that vkWaitForFences will wait forever if we haven't used the fence before.
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-            throw std::runtime_error("Failed to create semaphores!");
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+                vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+                vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+
+                throw std::runtime_error("Failed to create synchronization objects for a frame!");
+            }
         }
     }
 
-    void destroySemaphores() {
-        vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+    void destroySyncObjects() {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+        }
     }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
@@ -1080,9 +1104,14 @@ private:
             glfwPollEvents();
             drawFrame();
         }
+
+        vkDeviceWaitIdle(device);
     }
 
     void drawFrame() {
+        // Wait for the frame to be finished.
+        vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+
         // The function calls will return before the operations are actually finished
         // and the order of execution is also undefined. That is unfortunate,
         // because each of the operations depends on the previous one finishing.
@@ -1098,13 +1127,21 @@ private:
         // That's the point in time where we can start drawing to it.
         // The last parameter specifies a variable to output the index of the swap chain image that has become
         // available.
-        vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+        vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE,
+                              &imageIndex);
+
+        // Check if a previous frame is using this image (i.e. there is its fence to wait on).
+        if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+            vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+        }
+        // Mark the image as now being in use by this frame.
+        imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
         // Configure queue submission and synchronization.
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
         // We want to wait with writing colors to the image until it's available, so we're specifying the stage
         // of the graphics pipeline that writes to the color attachment.
         // Each entry in the waitStages array corresponds to the semaphore with the same index in pWaitSemaphores.
@@ -1115,13 +1152,47 @@ private:
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
 
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
+
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
             throw std::runtime_error("Failed to submit a draw command buffer!");
         }
+
+        // Submit the result back to the swapchain.
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+
+        VkSwapchainKHR swapChains[] = {swapChain};
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &imageIndex;
+
+        vkQueuePresentKHR(presentQueue, &presentInfo);
+
+        // Advance to the next frame every time.
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+        // // Subpasses in a render pass automatically take care of image layout transitions.
+        // // These transitions are controlled by subpass dependencies, which specify memory
+        // // and execution dependencies between subpasses. We have only a single subpass right now,
+        // // but the operations right before and right after this subpass also count as implicit "subpasses".
+
+        // VkSubpassDependency dependency{};
+        // // Refers to the implicit subpass before or after the render pass depending on whether it is
+        // // specified in srcSubpass or dstSubpass.
+        // dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        // // The dstSubpass must always be higher than srcSubpass to prevent cycles in the dependency graph
+        // // (unless one of the subpasses is VK_SUBPASS_EXTERNAL).
+        // dependency.dstSubpass = 0;
+        // // We need to wait for the swap chain to finish reading from the image before we can access it.
+        // dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        // dependency.srcAccessMask = 0;
     }
 };
 
