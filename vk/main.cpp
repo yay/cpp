@@ -14,7 +14,7 @@
 #include <set>
 #include <vector>
 
-// https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Framebuffers
+// https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Command_buffers
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -125,10 +125,25 @@ private:
     VkExtent2D swapChainExtent;
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
+
     // The image that we have to use for the attachment depends on which image the swap chain returns
     // when we retrieve one for presentation. That means that we have to create a framebuffer for all
     // of the images in the swap chain and use the one that corresponds to the retrieved image at drawing time.
     std::vector<VkFramebuffer> swapChainFramebuffers;
+
+    // Commands in Vulkan, like drawing operations and memory transfers, are not executed directly
+    // using function calls. You have to record all of the operations you want to perform
+    // in command buffer objects. The advantage of this is that all of the hard work of setting up
+    // the drawing commands can be done in advance and in multiple threads.
+    // After that, you just have to tell Vulkan to execute the commands in the main loop.
+    // Command pools manage the memory that is used to store the buffers,
+    // and command buffers are allocated from them.
+    VkCommandPool commandPool;
+
+    // Because one of the drawing commands involves binding the right VkFramebuffer,
+    // we'll actually have to record a command buffer for every image in the swap chain once again.
+    // Command buffers will be automatically freed when their command pool is destroyed.
+    std::vector<VkCommandBuffer> commandBuffers;
 
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
@@ -160,9 +175,12 @@ private:
         createRenderPass();
         createGraphicsPipeline();
         createFramebuffers();
+        createCommandPool();
+        createCommandBuffers();
     }
 
     void cleanupVulkan() {
+        destroyCommandPool();
         destroyFramebuffers();
         destroyGraphicsPipeline();
         destroyPipelineLayout();
@@ -818,6 +836,84 @@ private:
     void destroyFramebuffers() {
         for (auto framebuffer : swapChainFramebuffers) {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
+    }
+
+    void createCommandPool() {
+        // Command buffers are executed by submitting them on one of the device queues,
+        // like the graphics and presentation queues we retrieved.
+        QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+
+        // Each command pool can only allocate command buffers that are submitted on a single type of queue.
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+        poolInfo.flags = 0;
+
+        if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create a command pool!");
+        }
+    }
+
+    void destroyCommandPool() {
+        vkDestroyCommandPool(device, commandPool, nullptr);
+    }
+
+    void createCommandBuffers() {
+        commandBuffers.resize(swapChainFramebuffers.size());
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPool;
+        // Can be submitted to a queue for execution, but cannot be called from other command buffers.
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
+        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate command buffers!");
+        }
+
+        for (size_t i = 0; i < commandBuffers.size(); i++) {
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = 0;
+            beginInfo.pInheritanceInfo = nullptr;
+
+            // If the command buffer was already recorded once, then a call to vkBeginCommandBuffer
+            // will implicitly reset it. It's not possible to append commands to a buffer at a later time.
+            if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to begin recording a command buffer!");
+            }
+
+            VkRenderPassBeginInfo renderPassInfo{};
+            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassInfo.renderPass = renderPass;
+            renderPassInfo.framebuffer = swapChainFramebuffers[i];
+            renderPassInfo.renderArea.offset = {0, 0};
+            renderPassInfo.renderArea.extent = swapChainExtent;
+
+            // The last two parameters define the clear values to use for VK_ATTACHMENT_LOAD_OP_CLEAR,
+            // which we used as load operation for the color attachment. We define the clear color
+            // to simply be black with 100% opacity.
+            VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+            renderPassInfo.clearValueCount = 1;
+            renderPassInfo.pClearValues = &clearColor;
+
+            // All of the functions that record commands can be recognized by their vkCmd prefix.
+            // They all return void, so there will be no error handling until we've finished recording.
+            // The flag at the end means that the render pass commands will be embedded in the primary
+            // command buffer itself and no secondary command buffers will be executed.
+            vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+            vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+
+            vkCmdEndRenderPass(commandBuffers[i]);
+
+            if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to record a command buffer!");
+            }
         }
     }
 
