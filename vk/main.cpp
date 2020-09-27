@@ -14,7 +14,7 @@
 #include <vector>
 #include <fstream>
 
-// https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
+// https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Render_passes
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -123,6 +123,7 @@ private:
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
 
+    VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
 
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -148,11 +149,13 @@ private:
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createRenderPass();
         createGraphicsPipeline();
     }
 
     void cleanupVulkan() {
         destroyPipelineLayout();
+        destroyRenderPass();
         destroyImageViews();
         destroySwapChain();
         destroyLogicalDevice();
@@ -520,6 +523,50 @@ private:
             }
         }
     }
+
+    // Tells Vulkan about the framebuffer attachments that will be used while rendering.
+    void createRenderPass() {
+        VkAttachmentDescription colorAttachment{};
+        colorAttachment.format = swapChainImageFormat;
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        // loadOp and storeOp apply to color and depth data and determine what to do with the data
+        // in the attachment before rendering and after rendering.
+        // Clear the values to a constant (black) at the start.
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        // Rendered contents will be stored in memory and can be read later.
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+        // The layout of the pixels in memory can change based on what you're trying to do with an image.
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        // The index of the attachment in this array is directly referenced from the fragment shader with the
+        // 'layout(location = 0) out vec4 outColor' directive.
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+
+        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create render pass!");
+        }
+    }
+
+    void destroyRenderPass() { vkDestroyRenderPass(device, renderPass, nullptr); }
 
     // The graphics pipeline in Vulkan is almost completely immutable,
     // so you must recreate the pipeline from scratch if you want to change shaders,
