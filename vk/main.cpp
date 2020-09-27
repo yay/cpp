@@ -8,11 +8,11 @@
 
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <set>
 #include <vector>
-#include <fstream>
 
 // https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Framebuffers
 
@@ -42,14 +42,16 @@ struct QueueFamilyIndices {
     // extension must be supported.
     std::optional<uint32_t> presentFamily;
 
-    bool isComplete() { return graphicsFamily.has_value() && presentFamily.has_value(); }
+    bool isComplete() {
+        return graphicsFamily.has_value() && presentFamily.has_value();
+    }
 };
 
 // Just checking if a swap chain is available is not sufficient, because it may not actually
 // be compatible with our window surface.
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities; // min/max number of images in swap chain, min/max width and height of images
-    std::vector<VkSurfaceFormatKHR> formats; // pixel format, color space
+    std::vector<VkSurfaceFormatKHR> formats;    // pixel format, color space
     std::vector<VkPresentModeKHR> presentModes; // presentation modes
 
     SwapChainSupportDetails(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
@@ -68,7 +70,8 @@ struct SwapChainSupportDetails {
 
         if (presentModeCount != 0) {
             this->presentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, this->presentModes.data());
+            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount,
+                                                      this->presentModes.data());
         };
     }
 };
@@ -122,6 +125,10 @@ private:
     VkExtent2D swapChainExtent;
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
+    // The image that we have to use for the attachment depends on which image the swap chain returns
+    // when we retrieve one for presentation. That means that we have to create a framebuffer for all
+    // of the images in the swap chain and use the one that corresponds to the retrieved image at drawing time.
+    std::vector<VkFramebuffer> swapChainFramebuffers;
 
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
@@ -152,9 +159,12 @@ private:
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
+        createFramebuffers();
     }
 
     void cleanupVulkan() {
+        destroyFramebuffers();
+        destroyGraphicsPipeline();
         destroyPipelineLayout();
         destroyRenderPass();
         destroyImageViews();
@@ -209,7 +219,9 @@ private:
         }
     }
 
-    void destroyInstance() { vkDestroyInstance(instance, nullptr); }
+    void destroyInstance() {
+        vkDestroyInstance(instance, nullptr);
+    }
 
     void createSurface() {
         // This uses different implementation for each supported platform.
@@ -218,7 +230,9 @@ private:
         }
     }
 
-    void destroySurface() { vkDestroySurfaceKHR(instance, surface, nullptr); }
+    void destroySurface() {
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+    }
 
     void pickPhysicalDevice() {
         uint32_t deviceCount = 0;
@@ -255,7 +269,8 @@ private:
         bool extensionsSupported = checkDeviceExtensionSupport(device);
         bool swapChainAdequate = false;
         if (extensionsSupported) {
-            // It is important that we only try to query for swap chain support after verifying that the extension is available.
+            // It is important that we only try to query for swap chain support after verifying that the extension is
+            // available.
             SwapChainSupportDetails swapChainSupport(device, surface);
             swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
         }
@@ -308,14 +323,14 @@ private:
 
         std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
-        #ifndef NDEBUG
+#ifndef NDEBUG
         std::cout << "Supported extensions:" << std::endl;
-        #endif
+#endif
         for (const auto& extension : availableExtensions) {
             requiredExtensions.erase(extension.extensionName);
-            #ifndef NDEBUG
+#ifndef NDEBUG
             std::cout << extension.extensionName << std::endl;
-            #endif
+#endif
         }
 
         return requiredExtensions.empty();
@@ -406,7 +421,9 @@ private:
         vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     }
 
-    void destroyLogicalDevice() { vkDestroyDevice(device, nullptr); }
+    void destroyLogicalDevice() {
+        vkDestroyDevice(device, nullptr);
+    }
 
     void createSwapChain() {
         SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
@@ -449,8 +466,8 @@ private:
             // An image is owned by one queue family at a time and ownership must be explicitly
             // transferred before using it in another queue family.
             createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // best performance
-            createInfo.queueFamilyIndexCount = 0;     // optional
-            createInfo.pQueueFamilyIndices = nullptr; // optional
+            createInfo.queueFamilyIndexCount = 0;                    // optional
+            createInfo.pQueueFamilyIndices = nullptr;                // optional
         }
 
         // Don't use any transformations.
@@ -567,7 +584,9 @@ private:
         }
     }
 
-    void destroyRenderPass() { vkDestroyRenderPass(device, renderPass, nullptr); }
+    void destroyRenderPass() {
+        vkDestroyRenderPass(device, renderPass, nullptr);
+    }
 
     // The graphics pipeline in Vulkan is almost completely immutable,
     // so you must recreate the pipeline from scratch if you want to change shaders,
@@ -747,6 +766,10 @@ private:
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
+    void destroyGraphicsPipeline() {
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+    }
+
     void createPipelineLayout(VkDevice device) {
         // You can use uniform values in shaders, which are globals similar to dynamic state variables that can be
         // changed at drawing time to alter the behavior of your shaders without having to recreate them. They are
@@ -765,7 +788,38 @@ private:
         }
     }
 
-    void destroyPipelineLayout() { vkDestroyPipelineLayout(device, pipelineLayout, nullptr); }
+    void destroyPipelineLayout() {
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    }
+
+    void createFramebuffers() {
+        swapChainFramebuffers.resize(swapChainImageViews.size());
+
+        for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+            VkImageView attachments[] = {swapChainImageViews[i]};
+
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            // You can only use a framebuffer with the render passes that it is compatible with,
+            // which roughly means that they use the same number and type of attachments.
+            framebufferInfo.renderPass = renderPass;
+            framebufferInfo.attachmentCount = 1;
+            framebufferInfo.pAttachments = attachments;
+            framebufferInfo.width = swapChainExtent.width;
+            framebufferInfo.height = swapChainExtent.height;
+            framebufferInfo.layers = 1;
+
+            if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create a framebuffer!");
+            }
+        }
+    }
+
+    void destroyFramebuffers() {
+        for (auto framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
+    }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
         // The one catch is that the size of the bytecode is specified in bytes,
@@ -829,13 +883,13 @@ private:
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
 
-        #ifndef NDEBUG
+#ifndef NDEBUG
         std::cout << "Required extensions:" << std::endl;
         for (const char* extension : extensions) {
             std::cout << extension << std::endl;
         }
         std::cout << std::endl;
-        #endif
+#endif
 
         return extensions;
     }
@@ -844,7 +898,7 @@ private:
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
         if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file!");
+            throw std::runtime_error(std::string("Failed to open file: ") + filename);
         }
 
         // The advantage of starting to read at the end of the file
