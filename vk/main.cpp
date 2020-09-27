@@ -14,7 +14,7 @@
 #include <vector>
 #include <fstream>
 
-// https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Render_passes
+// https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Framebuffers
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -125,6 +125,7 @@ private:
 
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
+    VkPipeline graphicsPipeline;
 
     VkDebugUtilsMessengerEXT debugMessenger;
 
@@ -709,6 +710,38 @@ private:
         dynamicState.pDynamicStates = dynamicStates;
 
         createPipelineLayout(device);
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pDepthStencilState = nullptr;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDynamicState = nullptr;
+        pipelineInfo.layout = pipelineLayout;
+        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.subpass = 0;
+        // Vulkan allows you to create a new graphics pipeline by deriving from an existing pipeline. The idea of
+        // pipeline derivatives is that it is less expensive to set up pipelines when they have much functionality in
+        // common with an existing pipeline and switching between pipelines from the same parent can also be done
+        // quicker.
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        pipelineInfo.basePipelineIndex = -1;
+
+        // vkCreateGraphicsPipelines is designed to take multiple VkGraphicsPipelineCreateInfo objects
+        // and create multiple VkPipeline objects in a single call.
+        // A pipeline cache can be used to store and reuse data relevant to pipeline creation across multiple calls to
+        // vkCreateGraphicsPipelines and even across program executions if the cache is stored to a file.
+        // This makes it possible to significantly speed up pipeline creation at a later time.
+        if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("Failed to create a graphics pipeline!");
+        }
 
         vkDestroyShaderModule(device, fragShaderModule, nullptr);
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
