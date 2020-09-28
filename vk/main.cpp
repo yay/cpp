@@ -14,28 +14,26 @@
 #include <set>
 #include <vector>
 
-// https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Command_buffers
-
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 // How many frames should be processed concurrently.
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
-// The Vulkan API is designed around the idea of minimal driver overhead and one of the manifestations
-// of that goal is that there is very limited error checking in the API by default.
-// Validation layers are optional components that hook into Vulkan function calls to apply additional operations.
-const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
-// The swap chain is essentially a queue of images that are waiting to be presented to the screen.
-// The general purpose of the swap chain is to synchronize the presentation of images
-// with the refresh rate of the screen.
-const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
+
+// Validation layers are optional components that hook into Vulkan function calls
+// to apply additional operations.
+const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+// The swap chain is a queue of images that are waiting to be presented to the screen.
+// The general purpose of the swap chain is to synchronize the presentation of images
+// with the refresh rate of the screen. Since presentation is platform specific this
+// feature has to be loaded as an extension.
+const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 struct QueueFamilyIndices {
     // It's possible that the queue families supporting drawing commands
@@ -53,7 +51,8 @@ struct QueueFamilyIndices {
 // Just checking if a swap chain is available is not sufficient, because it may not actually
 // be compatible with our window surface.
 struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities; // min/max number of images in swap chain, min/max width and height of images
+    // For example min/max number of images in swap chain, min/max width/height of images.
+    VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;    // pixel format, color space
     std::vector<VkPresentModeKHR> presentModes; // presentation modes
 
@@ -1177,22 +1176,6 @@ private:
 
         // Advance to the next frame every time.
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-        // // Subpasses in a render pass automatically take care of image layout transitions.
-        // // These transitions are controlled by subpass dependencies, which specify memory
-        // // and execution dependencies between subpasses. We have only a single subpass right now,
-        // // but the operations right before and right after this subpass also count as implicit "subpasses".
-
-        // VkSubpassDependency dependency{};
-        // // Refers to the implicit subpass before or after the render pass depending on whether it is
-        // // specified in srcSubpass or dstSubpass.
-        // dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        // // The dstSubpass must always be higher than srcSubpass to prevent cycles in the dependency graph
-        // // (unless one of the subpasses is VK_SUBPASS_EXTERNAL).
-        // dependency.dstSubpass = 0;
-        // // We need to wait for the swap chain to finish reading from the image before we can access it.
-        // dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        // dependency.srcAccessMask = 0;
     }
 };
 
