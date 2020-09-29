@@ -84,6 +84,10 @@ public:
         return true;
     }
 
+    // Only use std::move to pass a named object as an argument to a && "move" parameter
+    // (rvalue reference parameter). C++ already uses move automatically when copying from
+    // an object it knows will never be used again, such as a temporary object or a local
+    // variable being returned or thrown from a function.
     bool push(T&& value) {
         if (_size >= _capacity) {
             if (!grow_capacity()) {
