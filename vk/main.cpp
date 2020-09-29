@@ -14,9 +14,6 @@
 #include <set>
 #include <vector>
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
-
 // How many frames should be processed concurrently.
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -29,12 +26,23 @@ const bool enableValidationLayers = true;
 // Validation layers are optional components that hook into Vulkan function calls
 // to apply additional operations.
 const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+
 // The swap chain is a queue of images that are waiting to be presented to the screen.
 // The general purpose of the swap chain is to synchronize the presentation of images
 // with the refresh rate of the screen. Since presentation is platform specific this
 // feature has to be loaded as an extension.
-const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+//
+// Types of extensions:
+// KHR - extensions that are likely to be included into the Vulkan spec
+//       or that are supported by a broad range of vendors and hardware
+// KHX - experimental versions of KHR extensions
+// EXT - aren't vendor specific but are targeting some less common use case
+// NV, AMD, etc. - vendor specific extensions
+const std::vector<const char*> requiredExtensionNames = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
+// Almost every operation in Vulkan, anything from drawing to uploading textures,
+// requires commands to be submitted to a queue. There are different types of queues
+// that originate from different queue families and each family of queues allows only a subset of commands.
 struct QueueFamilyIndices {
     // It's possible that the queue families supporting drawing commands
     // and the ones supporting presentation do not overlap.
@@ -48,12 +56,11 @@ struct QueueFamilyIndices {
     }
 };
 
-// Just checking if a swap chain is available is not sufficient, because it may not actually
-// be compatible with our window surface.
+// Checking if a swap chain is available is not sufficient
+// because it may not actually be compatible with our window surface.
 struct SwapChainSupportDetails {
-    // For example min/max number of images in swap chain, min/max width/height of images.
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;    // pixel format, color space
+    VkSurfaceCapabilitiesKHR capabilities;   // min/max # of images in swap chain, min/max width/height of images
+    std::vector<VkSurfaceFormatKHR> formats; // pixel format, color space
     std::vector<VkPresentModeKHR> presentModes; // presentation modes
 
     SwapChainSupportDetails(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
@@ -147,9 +154,11 @@ private:
     // Command buffers will be automatically freed when their command pool is destroyed.
     std::vector<VkCommandBuffer> commandBuffers;
 
-    // Each frame should have its own set of semaphores:
+    // Each frame should have its own set of semaphores.
+    // In Vulkan semaphores are used for GPU-GPU synchronization.
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
+    // In Vulkan fences are used for CPU-GPU synchronization.
     std::vector<VkFence> inFlightFences;
     std::vector<VkFence> imagesInFlight;
 
@@ -178,10 +187,9 @@ private:
 
     void setupWindow() {
         glfwInit();
-
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+        window = glfwCreateWindow(800, 600, "Vulkan", nullptr, nullptr);
         glfwSetWindowUserPointer(window, this);
         glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     }
@@ -348,8 +356,8 @@ private:
 
         QueueFamilyIndices indices = findQueueFamilies(device);
         bool dedicatedGPU = deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-        bool extensionsSupported = checkDeviceExtensionSupport(device);
         bool swapChainAdequate = false;
+        bool extensionsSupported = checkDeviceExtensionSupport(device);
         if (extensionsSupported) {
             // It is important that we only try to query for swap chain support after verifying that the extension is
             // available.
@@ -397,22 +405,16 @@ private:
     }
 
     bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+        std::set<std::string> requiredExtensions(requiredExtensionNames.begin(), requiredExtensionNames.end());
+
         uint32_t extensionCount;
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
-        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
-
-#ifndef NDEBUG
-        std::cout << "Supported extensions:" << std::endl;
-#endif
         for (const auto& extension : availableExtensions) {
             requiredExtensions.erase(extension.extensionName);
-#ifndef NDEBUG
-            std::cout << extension.extensionName << std::endl;
-#endif
         }
 
         return requiredExtensions.empty();
@@ -466,6 +468,7 @@ private:
         }
     }
 
+    // It's possible to create multiple logical devices from the same physical device.
     void createLogicalDevice() {
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
@@ -491,8 +494,8 @@ private:
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pEnabledFeatures = &deviceFeatures;
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-        createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensionNames.size());
+        createInfo.ppEnabledExtensionNames = requiredExtensionNames.data();
 
         // An example of a device specific extension is VK_KHR_swapchain,
         // which allows you to present rendered images from that device to windows.
