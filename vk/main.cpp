@@ -156,11 +156,25 @@ private:
     // To use the right pair of semaphores every time, we need to keep track of the current frame.
     size_t currentFrame = 0;
 
+    // Many drivers and platforms trigger VK_ERROR_OUT_OF_DATE_KHR automatically after a window resize,
+    // but it is not guaranteed to happen, so we handle the resize explicitly.
+    bool framebufferResized = false;
+
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
 
     VkDebugUtilsMessengerEXT debugMessenger;
+
+    // Use a static function as a callback is because GLFW does not know how to properly call
+    // a member function with the right 'this' pointer to our application instance.
+    // However, we do get a reference to the GLFWwindow in the callback
+    // and there is another GLFW function that allows us to store an arbitrary pointer
+    // inside of it: glfwSetWindowUserPointer.
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+        auto app = reinterpret_cast<TriangleApp*>(glfwGetWindowUserPointer(window));
+        app->framebufferResized = true;
+    }
 
     void setupWindow() {
         glfwInit();
@@ -168,6 +182,8 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+        glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     }
 
     void cleanupWindow() {
@@ -192,18 +208,53 @@ private:
     }
 
     void cleanupVulkan() {
+        destroySwapChain();
         destroySyncObjects();
         destroyCommandPool();
-        destroyFramebuffers();
-        destroyGraphicsPipeline();
-        destroyPipelineLayout();
-        destroyRenderPass();
-        destroyImageViews();
-        destroySwapChain();
         destroyLogicalDevice();
         cleanupDebugMessenger();
         destroySurface();
         destroyInstance();
+    }
+
+    void recreateSwapChain() {
+        int width;
+        int height;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0) { // window minimized
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        // Wait on the host for the completion of outstanding queue operations
+        // for all queues on a given logical device.
+        vkDeviceWaitIdle(device);
+
+        destroySwapChain();
+        createSwapChain();
+
+        // The image views need to be recreated because they are based directly on the swap chain images.
+        createImageViews();
+        // The render pass needs to be recreated because it depends on the format of the swap chain images.
+        createRenderPass();
+        // Viewport and scissor rectangle size is specified during graphics pipeline creation,
+        // so the pipeline also needs to be rebuilt.
+        createGraphicsPipeline();
+        // The framebuffers and command buffers also directly depend on the swap chain images.
+        createFramebuffers();
+        createCommandBuffers();
+    }
+
+    void destroySwapChain() {
+        destroyFramebuffers();
+        // Instead of recreating the command pool from scratch simply clean the existing one up.
+        vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+        destroyGraphicsPipeline();
+        destroyPipelineLayout();
+        destroyRenderPass();
+        destroyImageViews();
+        // Swap chain images are automatically cleaned up once the swap chain has been destroyed.
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
     }
 
     void createInstance() {
@@ -401,7 +452,10 @@ private:
         if (capabilities.currentExtent.width != UINT32_MAX) {
             return capabilities.currentExtent;
         } else {
-            VkExtent2D actualExtent = {WIDTH, HEIGHT};
+            int width;
+            int height;
+            glfwGetFramebufferSize(window, &width, &height);
+            VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 
             actualExtent.width = std::max(capabilities.minImageExtent.width,
                                           std::min(capabilities.maxImageExtent.width, actualExtent.width));
@@ -530,11 +584,6 @@ private:
 
         swapChainImageFormat = surfaceFormat.format;
         swapChainExtent = extent;
-    }
-
-    void destroySwapChain() {
-        // Note: swap chain images are automatically cleaned up once the swap chain has been destroyed.
-        vkDestroySwapchainKHR(device, swapChain, nullptr);
     }
 
     void createImageViews() {
@@ -1126,8 +1175,16 @@ private:
         // That's the point in time where we can start drawing to it.
         // The last parameter specifies a variable to output the index of the swap chain image that has become
         // available.
-        vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE,
-                              &imageIndex);
+        VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame],
+                                                VK_NULL_HANDLE, &imageIndex);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+            // The swap chain has become incompatible with the surface and can no longer be used for rendering.
+            // Usually happens after a window resize.
+            recreateSwapChain();
+            return;
+        } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+            throw std::runtime_error("Failed to acquire a swap chain image!");
+        }
 
         // Check if a previous frame is using this image (i.e. there is its fence to wait on).
         if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
@@ -1172,7 +1229,19 @@ private:
         presentInfo.pSwapchains = swapChains;
         presentInfo.pImageIndices = &imageIndex;
 
-        vkQueuePresentKHR(presentQueue, &presentInfo);
+        result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+            // If the swap chain turns out to be out of date when attempting to acquire an image,
+            // then it is no longer possible to present to it.
+            // It is important to perform the framebufferResized check after vkQueuePresentKHR
+            // to ensure that the semaphores are in a consistent state, otherwise a signalled semaphore
+            // may never be properly waited upon.
+            framebufferResized = false;
+            recreateSwapChain();
+        } else if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to present a swap chain image!");
+        }
 
         // Advance to the next frame every time.
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
