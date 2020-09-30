@@ -59,8 +59,8 @@ struct QueueFamilyIndices {
 // Checking if a swap chain is available is not sufficient
 // because it may not actually be compatible with our window surface.
 struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;   // min/max # of images in swap chain, min/max width/height of images
-    std::vector<VkSurfaceFormatKHR> formats; // pixel format, color space
+    VkSurfaceCapabilitiesKHR capabilities;      // min/max # of images in swap chain, min/max width/height of images
+    std::vector<VkSurfaceFormatKHR> formats;    // pixel format, color space
     std::vector<VkPresentModeKHR> presentModes; // presentation modes
 
     SwapChainSupportDetails(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
@@ -277,7 +277,7 @@ private:
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+        appInfo.apiVersion = VK_API_VERSION_1_2;
 
         // Tells the Vulkan driver which global extensions and validation layers we want to use.
         VkInstanceCreateInfo createInfo{};
