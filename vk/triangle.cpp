@@ -65,7 +65,7 @@ struct SwapChainSupportDetails {
             this->presentModes.resize(presentModeCount);
             vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount,
                                                       this->presentModes.data());
-        };
+        }
     }
 };
 
