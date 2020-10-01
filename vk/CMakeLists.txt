@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 # include(CTest)
 # enable_testing()
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp triangle.h triangle.cpp)
 
 find_package(Vulkan)
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
