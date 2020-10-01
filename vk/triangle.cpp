@@ -343,6 +343,12 @@ bool Triangle::isDeviceSuitable(VkPhysicalDevice device) {
     return suitable;
 }
 
+/**
+ * @brief Returns the indices for the graphics and present queue families.
+ *
+ * @param device
+ * @return QueueFamilyIndices
+ */
 QueueFamilyIndices Triangle::findQueueFamilies(VkPhysicalDevice device) {
     QueueFamilyIndices indices;
 
@@ -496,8 +502,9 @@ void Triangle::createSwapChain() {
     // before we can acquire another image to render to, so we request one more than the minimum.
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 
-    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
-        imageCount = swapChainSupport.capabilities.maxImageCount;
+    const auto maxImageCount = swapChainSupport.capabilities.maxImageCount;
+    if (maxImageCount > 0 && imageCount > maxImageCount) {
+        imageCount = maxImageCount;
     }
 
     VkSwapchainCreateInfoKHR createInfo{};
@@ -514,10 +521,12 @@ void Triangle::createSwapChain() {
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+    // Keep the declaration here so that the variable is not destroyed before the vkCreateSwapchainKHR call.
     uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
     if (indices.graphicsFamily != indices.presentFamily) {
-        // Images can be used across multiple queue families without explicit ownership transfers.
+        // Specifies that images can be used across multiple queue families
+        // without explicit ownership transfers.
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -560,7 +569,13 @@ void Triangle::createSwapChain() {
     swapChainExtent = extent;
 }
 
+/**
+ * @brief Creates an image view for every image in the swapchain.
+ */
 void Triangle::createImageViews() {
+    // To use any VkImage in the render pipeline we have to create a VkImageView.
+    // It describes how to access the image and which part of the image to access,
+    // for example if it should be treated as a 2D depth texture without any mipmapping levels.
     swapChainImageViews.resize(swapChainImages.size());
 
     for (size_t i = 0; i < swapChainImages.size(); i++) {
