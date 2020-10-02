@@ -663,8 +663,8 @@ void Triangle::destroyRenderPass() {
 // However, because all of the operations you'll be doing in the pipeline are known in advance,
 // the driver can optimize for it much better.
 void Triangle::createGraphicsPipeline() {
-    auto vertShaderCode = readFile("../shaders/triangle-vert.spv");
-    auto fragShaderCode = readFile("../shaders/triangle-frag.spv");
+    auto vertShaderCode = readFile("../shaders/triangle.vert.spv");
+    auto fragShaderCode = readFile("../shaders/triangle.frag.spv");
 
     // The compilation and linking of the SPIR-V bytecode to machine code for execution
     // by the GPU doesn't happen until the graphics pipeline is created. That means that
