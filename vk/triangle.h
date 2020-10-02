@@ -83,29 +83,6 @@ private:
 
     VkDebugUtilsMessengerEXT debugMessenger;
 
-    void setupWindow();
-    void setupVulkan();
-
-    void mainLoop();
-    void drawFrame();
-
-    void cleanupVulkan();
-    void cleanupWindow();
-
-    void createSwapChain();
-    void recreateSwapChain();
-    void destroySwapChain();
-
-    void createInstance();
-    void destroyInstance();
-
-    void createSurface();
-    void destroySurface();
-    void pickPhysicalDevice();
-
-    void setupDebugMessenger();
-    void cleanupDebugMessenger();
-
     bool isDeviceSuitable(VkPhysicalDevice device);
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -114,8 +91,31 @@ private:
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
+    VkShaderModule createShaderModule(const std::vector<char>& code);
+    bool checkValidationLayerSupport();
+
+    void setupWindow();
+    void cleanupWindow();
+
+    void setupVulkan();
+    void cleanupVulkan();
+
+    void createInstance();
+    void destroyInstance();
+
+    void setupDebugMessenger();
+    void cleanupDebugMessenger();
+
+    void createSurface();
+    void destroySurface();
+    void pickPhysicalDevice();
+
     void createLogicalDevice();
     void destroyLogicalDevice();
+
+    void createSwapChain();
+    void recreateSwapChain();
+    void destroySwapChain();
 
     void createImageViews();
     void destroyImageViews();
@@ -140,6 +140,6 @@ private:
     void createSyncObjects();
     void destroySyncObjects();
 
-    VkShaderModule createShaderModule(const std::vector<char>& code);
-    bool checkValidationLayerSupport();
+    void mainLoop();
+    void drawFrame();
 };
