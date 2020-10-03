@@ -135,8 +135,6 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
-// https://vulkan-tutorial.com/en/Drawing_a_triangle/Setup/Validation_layers
-
 // Use a static function as a callback is because GLFW does not know how to properly call
 // a member function with the right 'this' pointer to our application instance.
 // However, we do get a reference to the GLFWwindow in the callback
@@ -610,6 +608,40 @@ void Triangle::createImageViews() {
         }
     }
 }
+
+// Graphics Pipeline:
+
+// Vertex/Index Buffer -> Input Assembler -> Vertex Shader -> Tesselation -> Geometry shader ->
+// -> Rasterization -> Fragment Shader -> Color Blending -> Framebuffer
+
+// Input Assembler (FF) - collects the raw vertex data from the buffers you specify and may also use
+//                   an index buffer to repeat certain elements without having to duplicate the
+//                   vertex data itself.
+
+// Vertex Shader - is run for every vertex and generally applies transformations to turn vertex positions
+//                 from model space to screen space. Also passes per-vertex data down the pipeline.
+
+// Tesselation Shader - allow subdividing geometry based on certain rules to increase the mesh quality.
+
+// Geometry Shader - is run on every primitive (triangle, line, point) and can discard it or output more
+//                   primitives than came in. Similar to tesselation but much more flexible.
+
+// Rasterization (FF) - discretizes the primitives into fragments. These are the pixel elements that they
+//                 fill on the framebuffer. Any fragments that fall outside the screen are discarded
+//                 and the attributes outputted by the vertex shader are interpolated across the
+//                 fragments. The fragments that are behind other primitive fragments are usually
+//                 also discarded here because of depth testing.
+
+// Fragment Shader - is invoked for every fragment that survives and determines which framebuffer(s)
+//                   the fragments are written to and with which color and depth values. It can do
+//                   this using the interpolated data from the vertex shader, which can include
+//                   thinks like texture coordinates and normals for lighting.
+
+// Color Blending (FF) - applies operations to mix different fragments that map to the same pixel in the
+//                  framebuffer. Fragments can simply overwrite each other, add up or be mixed based
+//                  on transparency.
+
+// FF - fixed function stage
 
 // Tells Vulkan about the framebuffer attachments that will be used while rendering.
 void Triangle::createRenderPass() {
