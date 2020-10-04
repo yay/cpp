@@ -745,6 +745,7 @@ void Triangle::createGraphicsPipeline() {
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // triangle from every 3 vertices without reuse
+    // Vertices are loaded from the vertex buffer by index in sequential order.
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     // A viewport describes the region of the framebuffer that the output will be rendered to.
