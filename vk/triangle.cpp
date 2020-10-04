@@ -646,22 +646,32 @@ void Triangle::createImageViews() {
 // Tells Vulkan about the framebuffer attachments that will be used while rendering.
 void Triangle::createRenderPass() {
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapChainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.format = swapChainImageFormat;   // these two formats should match
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // no multi-sampling
     // loadOp and storeOp apply to color and depth data and determine what to do with the data
     // in the attachment before rendering and after rendering.
     // Clear the values to a constant (black) at the start.
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     // Rendered contents will be stored in memory and can be read later.
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
+    // stencilLoadOp and stencilStoreOp apply to stencil data. We are not doing anything
+    // with the stencil buffer, so the results of loading and storing are irrelevant.
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-    // The layout of the pixels in memory can change based on what you're trying to do with an image.
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    // Textures and framebuffers in Vulkan are represented by VkImage objects with a certain pixel
+    // format, however the layout of pixels in memory can change based on what you're trying to
+    // do with an image.
 
+    // Specify which layout the image will have before the render pass begins.
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    // The layout to transition to when the render pass finishes.
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // images to be presented in the swap chain
+
+    // A single render pass can consist of multiple subpasses. Subpasses are subsequent rendering operations
+    // that depend on the contents of framebuffers in previous passes, for example a sequence of post-processing
+    // effects that are applied one after another.
+    // We'll use a single subpass.
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
