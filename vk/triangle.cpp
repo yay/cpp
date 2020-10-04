@@ -775,12 +775,22 @@ void Triangle::createGraphicsPipeline() {
     // to output fragments that fill entire polygons or just the edges (wireframe).
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    // If true then fragments that are beyond the near and far planes are clamped to
+    // them as opposed to discarding them.
     rasterizer.depthClampEnable = VK_FALSE;
+    // If true, the geometry never passes through the rasterizer stage.
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    // The thickness of lines in terms of number of fragments.
+    // The maximum line width that is supported depends on the hardware
+    // (lineWidthRange and lineWidthGranularity in VkPhysicalDeviceLimits)
+    // and any line thicker than 1.0f requires 'wideLines' in VkphysicalDeviceFeatures to be true.
     rasterizer.lineWidth = 1.0f;
+    // You can disable culling, cull the front faces, cull the back faces or both.
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // The vertex order for faces to be considered front-facing.
+    // The rasterizer can alter the depth values by adding a constant value or biasing them
+    // based on a fragment's slope. This is sometimes used for shadow mapping.
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
@@ -812,13 +822,6 @@ void Triangle::createGraphicsPipeline() {
     colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-    // colorBlendAttachment.blendEnable = VK_TRUE;
-    // colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    // colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    // colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    // colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    // colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    // colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
