@@ -671,16 +671,17 @@ void Triangle::createRenderPass() {
     // A single render pass can consist of multiple subpasses. Subpasses are subsequent rendering operations
     // that depend on the contents of framebuffers in previous passes, for example a sequence of post-processing
     // effects that are applied one after another.
-    // We'll use a single subpass.
+    // We'll use a single subpass. Every subpass references one or more VkAttachmentDescription.
     VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentRef.attachment = 0; // reference attachment by its index in the pAttachments array.
+    // Vulkan will automatically transition the attachment to this layout when the subpass is started.
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // our attachment functions as a color buffer
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
     // The index of the attachment in this array is directly referenced from the fragment shader with the
     // 'layout(location = 0) out vec4 outColor' directive.
-    subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
     VkRenderPassCreateInfo renderPassInfo{};
@@ -691,7 +692,7 @@ void Triangle::createRenderPass() {
     renderPassInfo.pSubpasses = &subpass;
 
     if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create render pass!");
+        throw std::runtime_error("Failed to create render pass!");
     }
 }
 
