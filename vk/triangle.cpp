@@ -857,7 +857,7 @@ void Triangle::createGraphicsPipeline() {
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = nullptr;
     pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = nullptr;
+    pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
@@ -869,10 +869,10 @@ void Triangle::createGraphicsPipeline() {
     pipelineInfo.basePipelineIndex = -1;
 
     // vkCreateGraphicsPipelines is designed to take multiple VkGraphicsPipelineCreateInfo objects
-    // and create multiple VkPipeline objects in a single call.
-    // A pipeline cache can be used to store and reuse data relevant to pipeline creation across multiple calls to
-    // vkCreateGraphicsPipelines and even across program executions if the cache is stored to a file.
-    // This makes it possible to significantly speed up pipeline creation at a later time.
+    // and create multiple VkPipeline objects in a single call, but we are using one of each here.
+    // A pipeline cache (second parameter) can be used to store and reuse data relevant to pipeline creation
+    // across multiple calls to vkCreateGraphicsPipelines and even across program executions if the cache
+    // is stored to a file. This makes it possible to significantly speed up pipeline creation at a later time.
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create a graphics pipeline!");
     }
