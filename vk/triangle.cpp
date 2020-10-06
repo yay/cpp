@@ -235,6 +235,71 @@ void Triangle::destroySwapChain() {
     vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
 
+void Triangle::setupDebugMessenger() {
+    if (!enableValidationLayers)
+        return;
+
+    VkDebugUtilsMessengerCreateInfoEXT createInfo;
+    populateDebugMessengerCreateInfo(createInfo);
+
+    if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to set up debug messenger!");
+    }
+}
+
+void Triangle::cleanupDebugMessenger() {
+    if (!enableValidationLayers)
+        return;
+
+    DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+}
+
+bool Triangle::checkValidationLayerSupport() {
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    for (const char* layerName : validationLayers) {
+        bool layerFound = false;
+
+        for (const auto& layerProperties : availableLayers) {
+            if (strcmp(layerName, layerProperties.layerName) == 0) {
+                layerFound = true;
+                break;
+            }
+        }
+
+        if (!layerFound) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::vector<const char*> Triangle::getRequiredExtensions() {
+    uint32_t glfwExtensionCount = 0;
+    // This includes platform-specific extensions needed to create a window surface.
+    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+    if (enableValidationLayers) {
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+
+#ifndef NDEBUG
+    std::cout << "Required extensions:" << std::endl;
+    for (const char* extension : extensions) {
+        std::cout << extension << std::endl;
+    }
+    std::cout << std::endl;
+#endif
+
+    return extensions;
+}
+
 void Triangle::createInstance() {
     if (enableValidationLayers && !checkValidationLayerSupport()) {
         throw std::runtime_error("Validation layers requested but not available!");
@@ -614,6 +679,12 @@ void Triangle::createImageViews() {
     }
 }
 
+void Triangle::destroyImageViews() {
+    for (auto imageView : swapChainImageViews) {
+        vkDestroyImageView(device, imageView, nullptr);
+    }
+}
+
 // Graphics Pipeline:
 
 // Vertex/Index Buffer -> Input Assembler -> Vertex Shader -> Tesselation -> Geometry shader ->
@@ -703,6 +774,27 @@ void Triangle::createRenderPass() {
 
 void Triangle::destroyRenderPass() {
     vkDestroyRenderPass(device, renderPass, nullptr);
+}
+
+VkShaderModule Triangle::createShaderModule(const std::vector<char>& code) {
+    // The one catch is that the size of the bytecode is specified in bytes,
+    // but the bytecode pointer is a uint32_t pointer rather than a char pointer.
+    // Therefore we will need to cast the pointer with reinterpret_cast as shown
+    // below. When you perform a cast like this, you also need to ensure that the data satisfies
+    // the alignment requirements of uint32_t. Lucky for us, the data is stored in an std::vector
+    // where the default allocator already ensures that the data satisfies the worst case
+    // alignment requirements.
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = code.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+    VkShaderModule shaderModule;
+    if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create a shader module!");
+    }
+
+    return shaderModule;
 }
 
 // The graphics pipeline in Vulkan is almost completely immutable,
@@ -1063,98 +1155,6 @@ void Triangle::destroySyncObjects() {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
         vkDestroyFence(device, inFlightFences[i], nullptr);
     }
-}
-
-VkShaderModule Triangle::createShaderModule(const std::vector<char>& code) {
-    // The one catch is that the size of the bytecode is specified in bytes,
-    // but the bytecode pointer is a uint32_t pointer rather than a char pointer.
-    // Therefore we will need to cast the pointer with reinterpret_cast as shown
-    // below. When you perform a cast like this, you also need to ensure that the data satisfies
-    // the alignment requirements of uint32_t. Lucky for us, the data is stored in an std::vector
-    // where the default allocator already ensures that the data satisfies the worst case
-    // alignment requirements.
-    VkShaderModuleCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create a shader module!");
-    }
-
-    return shaderModule;
-}
-
-void Triangle::destroyImageViews() {
-    for (auto imageView : swapChainImageViews) {
-        vkDestroyImageView(device, imageView, nullptr);
-    }
-}
-
-bool Triangle::checkValidationLayerSupport() {
-    uint32_t layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    std::vector<VkLayerProperties> availableLayers(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-    for (const char* layerName : validationLayers) {
-        bool layerFound = false;
-
-        for (const auto& layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
-                layerFound = true;
-                break;
-            }
-        }
-
-        if (!layerFound) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-std::vector<const char*> Triangle::getRequiredExtensions() {
-    uint32_t glfwExtensionCount = 0;
-    // This includes platform-specific extensions needed to create a window surface.
-    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-    if (enableValidationLayers) {
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
-
-#ifndef NDEBUG
-    std::cout << "Required extensions:" << std::endl;
-    for (const char* extension : extensions) {
-        std::cout << extension << std::endl;
-    }
-    std::cout << std::endl;
-#endif
-
-    return extensions;
-}
-
-void Triangle::setupDebugMessenger() {
-    if (!enableValidationLayers)
-        return;
-
-    VkDebugUtilsMessengerCreateInfoEXT createInfo;
-    populateDebugMessengerCreateInfo(createInfo);
-
-    if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to set up debug messenger!");
-    }
-}
-
-void Triangle::cleanupDebugMessenger() {
-    if (!enableValidationLayers)
-        return;
-
-    DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 }
 
 void Triangle::mainLoop() {

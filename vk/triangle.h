@@ -54,9 +54,11 @@ private:
 
     // Each frame should have its own set of semaphores.
     // In Vulkan semaphores are used for GPU-GPU synchronization.
-    std::vector<VkSemaphore> imageAvailableSemaphores;
-    std::vector<VkSemaphore> renderFinishedSemaphores;
+    std::vector<VkSemaphore> imageAvailableSemaphores; // image has been acquired and is ready for rendering
+    std::vector<VkSemaphore> renderFinishedSemaphores; // rendering has finished and presentation can happen
     // In Vulkan fences are used for CPU-GPU synchronization.
+    // The state of fences can be accessed from by the program via vkWaitForFences,
+    // and the state of semaphores cannot be.
     std::vector<VkFence> inFlightFences;
     std::vector<VkFence> imagesInFlight;
 
