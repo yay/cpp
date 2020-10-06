@@ -9,7 +9,8 @@
 
 // Almost every operation in Vulkan, anything from drawing to uploading textures,
 // requires commands to be submitted to a queue. There are different types of queues
-// that originate from different queue families and each family of queues allows only a subset of commands.
+// that originate from different queue families and each family of queues allows only
+// a subset of commands.
 struct QueueFamilyIndices {
     // It's possible that the queue families supporting drawing commands
     // and the ones supporting presentation do not overlap.
@@ -46,24 +47,9 @@ private:
     VkExtent2D swapChainExtent;
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
-
-    // The image that we have to use for the attachment depends on which image the swap chain returns
-    // when we retrieve one for presentation. That means that we have to create a framebuffer for all
-    // of the images in the swap chain and use the one that corresponds to the retrieved image at drawing time.
     std::vector<VkFramebuffer> swapChainFramebuffers;
 
-    // Commands in Vulkan, like drawing operations and memory transfers, are not executed directly
-    // using function calls. You have to record all of the operations you want to perform
-    // in command buffer objects. The advantage of this is that all of the hard work of setting up
-    // the drawing commands can be done in advance and in multiple threads.
-    // After that, you just have to tell Vulkan to execute the commands in the main loop.
-    // Command pools manage the memory that is used to store the buffers,
-    // and command buffers are allocated from them.
     VkCommandPool commandPool;
-
-    // Because one of the drawing commands involves binding the right VkFramebuffer,
-    // we'll actually have to record a command buffer for every image in the swap chain once again.
-    // Command buffers will be automatically freed when their command pool is destroyed.
     std::vector<VkCommandBuffer> commandBuffers;
 
     // Each frame should have its own set of semaphores.

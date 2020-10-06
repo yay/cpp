@@ -489,6 +489,11 @@ void Triangle::destroyLogicalDevice() {
     vkDestroyDevice(device, nullptr);
 }
 
+// Vulkan does not have the concept of a "default framebuffer", hence it requires an infrastructure
+// that will own the buffers we will render to before we visualize them on the screen.
+// This infrastructure is known as the swap chain and must be created explicitly in Vulkan.
+// The swap chain is essentially a queue of images that are waiting to be presented to the screen.
+// Our application will acquire such an image to draw to it, and then return it to the queue.
 void Triangle::createSwapChain() {
     SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
 
@@ -886,7 +891,7 @@ void Triangle::destroyGraphicsPipeline() {
 }
 
 void Triangle::createPipelineLayout(VkDevice device) {
-    // You can use uniform values in shaders, which are globals similar to dynamic state variables that can be
+    // You can use 'uniform' values in shaders, which are globals similar to dynamic state variables that can be
     // changed at drawing time to alter the behavior of your shaders without having to recreate them. They are
     // commonly used to pass the transformation matrix to the vertex shader, or to create texture samplers in the
     // fragment shader.
@@ -895,7 +900,7 @@ void Triangle::createPipelineLayout(VkDevice device) {
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 0;
     pipelineLayoutInfo.pSetLayouts = nullptr;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pushConstantRangeCount = 0; // another way of passing dynamic values to shaders
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
@@ -907,6 +912,12 @@ void Triangle::destroyPipelineLayout() {
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 }
 
+// Framebuffers represent a series of memory attachments (e.g. color, depth, etc.) that each subpass
+// can read from and write to. The image that we have to use for the attachment depends on which image
+// the swap chain returns when we retrieve one for presentation. That means that we have to create a framebuffer
+// for all of the images in the swap chain and use the one that corresponds to the retrieved image at drawing time.
+// The attachments specified during render pass creation are bound by wrapping them into a VkFramebuffer object.
+// A framebuffer object references all of the VkImageView objects that represent the attachments.
 void Triangle::createFramebuffers() {
     swapChainFramebuffers.resize(swapChainImageViews.size());
 
@@ -936,6 +947,12 @@ void Triangle::destroyFramebuffers() {
     }
 }
 
+// Commands in Vulkan, like drawing operations and memory transfers, are not executed directly using
+// function calls. You have to record all of the operations you want to perform in command buffer objects.
+// The advantage of this is that all of the hard work of setting up the drawing commands can be done
+// in advance and in multiple threads.
+// After that, you just have to tell Vulkan to execute the commands in the main loop.
+// Command pools manage the memory that is used to store the buffers, and command buffers are allocated from them.
 void Triangle::createCommandPool() {
     // Command buffers are executed by submitting them on one of the device queues,
     // like the graphics and presentation queues we retrieved.
@@ -956,6 +973,9 @@ void Triangle::destroyCommandPool() {
     vkDestroyCommandPool(device, commandPool, nullptr);
 }
 
+// Because one of the drawing commands involves binding the right VkFramebuffer,
+// we'll actually have to record a command buffer for every image in the swap chain once again.
+// Command buffers will be automatically freed when their command pool is destroyed.
 void Triangle::createCommandBuffers() {
     commandBuffers.resize(swapChainFramebuffers.size());
 
