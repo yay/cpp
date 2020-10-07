@@ -161,7 +161,12 @@ void Triangle::setupWindow() {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     window = glfwCreateWindow(800, 600, "Vulkan", nullptr, nullptr);
     glfwSetWindowUserPointer(window, this);
+    iconified = glfwGetWindowAttrib(window, GLFW_ICONIFIED);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    glfwSetWindowIconifyCallback(window, [](GLFWwindow* window, int iconified) {
+        auto app = reinterpret_cast<Triangle*>(glfwGetWindowUserPointer(window));
+        app->iconified = iconified;
+    });
 }
 
 void Triangle::cleanupWindow() {

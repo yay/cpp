@@ -34,6 +34,7 @@ public:
 
 private:
     GLFWwindow* window;
+    int iconified;
 
     VkInstance instance;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
