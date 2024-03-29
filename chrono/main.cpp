@@ -1,4 +1,5 @@
 #include <iostream>
+#include <print>
 #include <chrono>
 #include <thread>
 #include <future>
@@ -9,23 +10,25 @@
 
 using namespace std::chrono;
 
-int find_answer() {
-    std::this_thread::sleep_for(5s);
+int find_answer()
+{
+    std::this_thread::sleep_for(2s);
     return 42;
 }
 
 std::future<int> f = std::async(find_answer);
 
-int main(int, char**) {
+int main(int, char **)
+{
     if (f.wait_for(2500ms) == std::future_status::ready)
-        std::cout << "Answer is: " << f.get() << "\n";
+        std::println("Answer is: {}", f.get());
     else
-        std::cout << "Can't wait anymore!\n";
+        std::println("Can't wait anymore!");
 
-
-    std::time_t result = std::time(nullptr);
-    std::cout << std::asctime(std::localtime(&result))
-              << result << " seconds since the Epoch\n";
+    std::time_t t = std::time(nullptr);
+    std::println("Seconds since the epoch: {}", t);
+    // Note: std::asctime and std::localtime are not thread-safe (have static internal storage).
+    std::println("{}", std::asctime(std::localtime(&t)));
 
     // auto now = system_clock::now();
 }

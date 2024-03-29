@@ -1,13 +1,13 @@
-#include <iostream>
 #include <vector>
 #include <complex>
 #include <algorithm>
+#include <print>
 
 void lambda();
 
 int main()
 {
-    std::cout << "Hello, World!" << std::endl;
+    std::println("{}", "Hello, World!");
 
     const double PI = 3.1415926;
 
@@ -16,9 +16,9 @@ int main()
     char myGrade = 'A';
 
     // char b {245}; // error: constant expression evaluates to 245
-                     // which cannot be narrowed to type 'char'
+    // which cannot be narrowed to type 'char'
     // char b = 245; // warning: implicit conversion from 'int' to 'char'
-                     // changes value from 245 to -11
+    // changes value from 245 to -11
     unsigned char byte = 245; // OK
 
     bool isHappy = true;
@@ -36,27 +36,29 @@ int main()
 
     long bigNumber = 1'000'000'000'000'000;
 
-    std::complex<double> z { 1.0, 2.0 };
+    std::complex<double> z{1.0, 2.0};
 
     float favNum = 3.141592; // normally accurate to 6 decimal numbers
 
     double otherFavNum = PI / 2;
 
-    std::cout << sizeof(myGrade) << std::endl;
-    std::cout << sizeof(isHappy) << std::endl;
-    std::cout << sizeof(myAge) << std::endl;
-    std::cout << sizeof(favNum) << std::endl;
-    std::cout << sizeof(PI) << std::endl;
+    std::println("{}", sizeof(myGrade));
+    std::println("{}", sizeof(isHappy));
+    std::println("{}", sizeof(myAge));
+    std::println("{}", sizeof(favNum));
+    std::println("{}", sizeof(PI));
 
-    int myNums[5] = { 1, 2, 3, 5, 8 };
+    int myNums[5] = {1, 2, 3, 5, 8};
 
-    char myName[2][3] = { {'J', 'o', 'e'}, {'B', 'o', 'b'} };
+    char myName[2][3] = {{'J', 'o', 'e'}, {'B', 'o', 'b'}};
 
-    for (int j = 0; j < 2; j++) {
-        for (int i = 0; i < 3; i++) {
-            std::cout << myName[j][i];
+    for (int j = 0; j < 2; j++)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            std::print("{}", myName[j][i]);
         }
-        std::cout << std::endl;
+        std::println("");
     }
 
     lambda();
@@ -64,7 +66,8 @@ int main()
     return 0;
 }
 
-void lambda() {
+void lambda()
+{
 
     struct isOdd
     {
@@ -74,18 +77,19 @@ void lambda() {
         }
     };
 
-    std::vector<int> col {1, 2, 3, 4, 5, 9, 8, 7, 6, 10, 15, 18, 20};
+    std::vector<int> col{1, 2, 3, 4, 5, 9, 8, 7, 6, 10, 15, 18, 20};
 
-    long numOdd = count_if(col.begin(), col.end(), isOdd());
+    int64_t numOdd = count_if(col.begin(), col.end(), isOdd());
 
-    std::cout << numOdd << " integers that are odd" << std::endl;
+    std::println("{} integers that are odd", numOdd);
 
-    long numEven = count_if( col.begin(), col.end(), [](int x) { return !(x % 2); } );
+    int64_t numEven = count_if(col.begin(), col.end(), [](int x)
+                               { return !(x % 2); });
 
     // For comparison, in Kotlin this would be:
     //
     //     val numEven = col.count { it % 2 == 0 }
     //
 
-    std::cout << numEven << " integers that are even" << std::endl;
+    std::println("{} integers that are even", numEven);
 }
